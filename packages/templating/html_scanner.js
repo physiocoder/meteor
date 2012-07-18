@@ -156,3 +156,5 @@ var html_scanner = {
 // For unit testing in server environment, don't.
 if (typeof module !== 'undefined')
   module.exports = html_scanner;
+else
+  global.html_scanner = html_scanner; // for unit tests

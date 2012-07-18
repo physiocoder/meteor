@@ -232,6 +232,15 @@ var Bundle = function () {
   // list of errors encountered while bundling. array of string.
   self.errors = [];
 
+  // wrapper for all server-side and client-side JS
+  self.wrapJS = function(data, where) {
+    var code = data.toString('utf8');
+
+    code = '(function(){ '+code+'\n})();';
+
+    return new Buffer(code);
+  };
+
   // the API available from register_extension handlers
   self.api = {
     /**
@@ -281,7 +290,7 @@ var Bundle = function () {
             throw new Error("Must specify path")
 
           if (w === "client" || w === "server") {
-            self.files[w][options.path] = data;
+            self.files[w][options.path] = self.wrapJS(data, w);
             self.js[w].push(options.path);
           } else {
             throw new Error("Invalid environment");

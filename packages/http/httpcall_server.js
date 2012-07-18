@@ -4,7 +4,7 @@ Meteor.http = Meteor.http || {};
 
   var request = __meteor_bootstrap__.require('request');
   var url_util = __meteor_bootstrap__.require('url');
-
+  var Future = __meteor_bootstrap__.require('fibers/future');
 
   Meteor.http.call = function(method, url, options, callback) {
 
