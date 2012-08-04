@@ -1,25 +1,27 @@
 // XXX could use some tests
 
-Session = _.extend({}, {
-  keys: {},
-  key_deps: {}, // key -> context id -> context
-  key_value_deps: {}, // key -> value -> context id -> context
+ReactiveDictionary = function () {
+  this.keys = {};
+  this.keyDeps = {}; // key -> context id -> context
+  this.keyValueDeps = {}; // key -> value -> context id -> context
+};
 
+_.extend(ReactiveDictionary.prototype, {
   // XXX remove debugging method (or improve it, but anyway, don't
   // ship it in production)
   dump_state: function () {
     var self = this;
-    console.log("=== Session state ===");
-    for (var key in self.key_deps) {
-      var ids = _.keys(self.key_deps[key]);
+    console.log("=== Listeners ===");
+    for (var key in self.keyDeps) {
+      var ids = _.keys(self.keyDeps[key]);
       if (!ids.length)
         continue;
       console.log(key + ": " + _.reject(ids, function (x) {return x === "_once"}).join(' '));
     }
 
-    for (var key in self.key_value_deps) {
-      for (var value in self.key_value_deps[key]) {
-        var ids = _.keys(self.key_value_deps[key][value]);
+    for (var key in self.keyValueDeps) {
+      for (var value in self.keyValueDeps[key]) {
+        var ids = _.keys(self.keyValueDeps[key][value]);
         if (!ids.length)
           continue;
         console.log(key + "(" + value + "): " + _.reject(ids, function (x) {return x === "_once";}).join(' '));
@@ -42,9 +44,9 @@ Session = _.extend({}, {
     };
 
     self._ensureKey(key);
-    invalidate(self.key_deps[key]);
-    invalidate(self.key_value_deps[key][old_value]);
-    invalidate(self.key_value_deps[key][value]);
+    invalidate(self.keyDeps[key]);
+    invalidate(self.keyValueDeps[key][old_value]);
+    invalidate(self.keyValueDeps[key][value]);
   },
 
   get: function (key) {
@@ -52,10 +54,10 @@ Session = _.extend({}, {
     var context = Meteor.deps.Context.current;
     self._ensureKey(key);
 
-    if (context && !(context.id in self.key_deps[key])) {
-      self.key_deps[key][context.id] = context;
+    if (context && !(context.id in self.keyDeps[key])) {
+      self.keyDeps[key][context.id] = context;
       context.on_invalidate(function () {
-        delete self.key_deps[key][context.id];
+        delete self.keyDeps[key][context.id];
       });
     }
 
@@ -70,23 +72,23 @@ Session = _.extend({}, {
         typeof value !== 'number' &&
         typeof value !== 'boolean' &&
         value !== null && value !== undefined)
-      throw new Error("Session.equals: value can't be an object");
+      throw new Error("equals: value can't be an object");
 
     if (context) {
       self._ensureKey(key);
-      if (!(value in self.key_value_deps[key]))
-        self.key_value_deps[key][value] = {};
+      if (!(value in self.keyValueDeps[key]))
+        self.keyValueDeps[key][value] = {};
 
-      if (!(context.id in self.key_value_deps[key][value])) {
-        self.key_value_deps[key][value][context.id] = context;
+      if (!(context.id in self.keyValueDeps[key][value])) {
+        self.keyValueDeps[key][value][context.id] = context;
         context.on_invalidate(function () {
-          delete self.key_value_deps[key][value][context.id];
+          delete self.keyValueDeps[key][value][context.id];
 
           // clean up [key][value] if it's now empty, so we don't use
           // O(n) memory for n = values seen ever
-          for (var x in self.key_value_deps[key][value])
+          for (var x in self.keyValueDeps[key][value])
             return;
-          delete self.key_value_deps[key][value];
+          delete self.keyValueDeps[key][value];
         });
       }
     }
@@ -96,13 +98,14 @@ Session = _.extend({}, {
 
   _ensureKey: function (key) {
     var self = this;
-    if (!(key in self.key_deps)) {
-      self.key_deps[key] = {};
-      self.key_value_deps[key] = {};
+    if (!(key in self.keyDeps)) {
+      self.keyDeps[key] = {};
+      self.keyValueDeps[key] = {};
     }
   }
 });
 
+Session = new ReactiveDictionary;
 
 if (Meteor._reload) {
   Meteor._reload.on_migrate('session', function () {
