@@ -98,9 +98,6 @@ Form = function (template) {
   // User's properties ("form variables") accessible with get/set
   self.store = new ReactiveDictionary;
 
-  // The current values for the template data context.
-  self.templateData = new ReactiveDictionary;
-
   // Our private state. Keys:
   // - status; form submission status, status() return value
   self.privateState = new ReactiveDictionary;
@@ -125,7 +122,16 @@ Form = function (template) {
       /* XXX verify we at least have options.name? */;
     var field = _.extend({
       load: function () {
-        return self.templateData.get(options.name);
+        // XXX need to reactively get the 'options.name' key on the
+        // template data.. ON THE NODE MATCHING THE
+        // SELECTOR. fortunately, we know that the node is inside our
+        // backing landmark, so we can just poll the data
+        // (getDataContext) whenever we're rerendered. (XXX no! also
+        // need to check when a child is rerendered, not just
+        // us. consider the case of a template containing an isolate
+        // containing a with containing our bound <input>. data can
+        // change without rerendering our landmark.
+        return 'XXX';
       },
       save: function () {
         // XXX save to database, if supported by data context object?
@@ -209,16 +215,6 @@ _.extend(Form.prototype, {
         self._setUpBinding(field);
       }
     });
-
-    // update this.templateData to track changes in the data context
-    var firstNodeInRendering = /* XXX */;
-    var currentTemplateData = Spark.getDataContext(firstNodeInRendering);
-    if (currentTemplateData instanceof Object) {
-      for (var key in currentTemplateData) {
-        this.templateData.set(key, currentTemplateData[key]);
-      }
-    } else
-      /* XXX what to do? */;
   },
 
   _destroy: function () {
