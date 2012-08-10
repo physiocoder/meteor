@@ -60,6 +60,16 @@ Templating.optionsForTemplateLandmark(function (options, t) {
   during pre-materialize, which will lazily match or create the
   landmark?
  */
+/*
+  XXX need to have a hook into spark that is called around
+  renderToRegion, or when Meteor.list calls Meteor.render
+
+  use this to initialize Meteor.form at the top of a rendering
+
+  the other hook we need is inside landmark creation (at the top of a
+  template)
+ */
+
 Templating.hookHelperInvocation(function (next) {
   var saved = Meteor.form;
 
