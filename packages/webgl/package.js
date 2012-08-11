@@ -20,12 +20,27 @@ Package.register_extension(
     var contents = fs.readFileSync(source_path);
     var source = contents.toString('utf8');
 
+    // A shader begins with a line like "//! FRAGMENT foo"
+    // or "//! VERTEX bar" and continues until the next line
+    // starting with "//!" or end of file.  It is then exposed
+    // as Shader.foo or Shader.bar.
 
-    // XXX parse out multiple shaders, assign to Shader object.
-    // <shader type="vertex" name="foo">...</shader> or something
-    // quick and dirty for now?
+    var sections = source.match(
+        /^\/\/![\s\S]*?(?:(?=^\/\/!)|(?![\s\S]))/mg);
 
-    var jsCode = '_def_shader(' + JSON.stringify(source) + ')';
+    var jsCode = '';
+    sections.forEach(function(s) {
+      var lines = s.split('\n');
+      var firstLine = lines.shift();
+      var stuff = firstLine.match(/^\/\/!\s*(FRAGMENT|VERTEX)\s*(\S.*)$/);
+      if (! stuff)
+        return;
+
+      var name = stuff[2];
+      var type = stuff[1].toLowerCase();
+      jsCode += '_def_shader(' + JSON.stringify(
+        { name: name, type: type, code: lines.join('\n') }) + ');';
+    });
 
     var path_part = path.dirname(serve_path);
     if (path_part === '.')

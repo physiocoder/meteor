@@ -1,5 +1,6 @@
 
+Shader = {};
 
-_def_shader = function (code) {
-  console.log(code);
+_def_shader = function (shader) {
+  Shader[shader.name] = shader;
 };
