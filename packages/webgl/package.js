@@ -26,18 +26,18 @@ Package.register_extension(
     // as Shader.foo or Shader.bar.
 
     var sections = source.match(
-        /^\/\/![\s\S]*?(?:(?=^\/\/!)|(?![\s\S]))/mg);
+        /^\/\/\/*![\s\S]*?(?:(?=^\/\/\/*!)|(?![\s\S]))/mg);
 
     var jsCode = '';
     sections.forEach(function(s) {
       var lines = s.split('\n');
       var firstLine = lines.shift();
-      var stuff = firstLine.match(/^\/\/!\s*(FRAGMENT|VERTEX)\s*(\S.*)$/);
+      var stuff = firstLine.match(/^\/\/\/*!\s*(FRAGMENT|VERTEX)\s*(\S.*)$/);
       if (! stuff)
         return;
 
       var name = stuff[2];
-      var type = stuff[1].toLowerCase();
+      var type = stuff[1].toLowerCase(); // e.g. 'fragment'
       jsCode += '_def_shader(' + JSON.stringify(
         { name: name, type: type, code: lines.join('\n') }) + ');';
     });
