@@ -7,7 +7,7 @@ Template.basicDemo.color = function () {
 };
 
 Template.basicDemo.events({
-  'click .red': function () { Meteor.form.set("red"); },
-  'click .blue': function () { Meteor.form.set("blue"); },
-  'click .green': function () { Meteor.form.set("green"); },
+  'click .red': function () { Meteor.form.set("color", "red"); },
+  'click .blue': function () { Meteor.form.set("color", "blue"); },
+  'click .green': function () { Meteor.form.set("color", "green"); },
 });
