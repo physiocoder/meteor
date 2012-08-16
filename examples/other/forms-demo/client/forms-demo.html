@@ -1,0 +1,27 @@
+<head>
+  <title>Forms Demo</title>
+</head>
+
+<body>
+  {{> page}}
+</body>
+
+<template name="page">
+  <h1>Forms Demo</h1>
+  <p>
+    A work in progress.
+  </p>
+
+  {{> basicDemo }}
+</template>
+
+<template name="basicDemo">
+  <div class="basicDemo">
+    My favorite color: <input type="text" class="color"><br>
+    The value of the field is {{color}}<br>
+    Set to:
+      <input type="button" class="red" value="Red">
+      <input type="button" class="blue" value="Blue">
+      <input type="button" class="green" value="Green">
+  </div>
+</template>

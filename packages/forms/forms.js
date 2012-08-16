@@ -1,155 +1,160 @@
 // Generic controller for forms
 
+/*
+  XXX HERE XXX HERE
+
+
+  Things that stop the demo from working:
+
+  - Meteor.form is sometimes set correctly for helpers, and sometimes
+    not. It's set correctly on first template render, and if the
+    template is getting completely rerendered (an isolate that
+    encloses the whole template.) It won't be set correctly for
+    rerenders inside a template for in-retrospect-obvious reasons.
+
+  - We don't have aroundEvent so we're not even trying to set
+    Meteor.form inside events.
+
+
+    ---
+
+    Does Spark actually give us enough rope to do #1?
+
+    I suppose we want the form for the nearest enclosing landmark?
+
+    We are back in a situation where we need to know where the stuff
+    we're currently rendering is going to be inserted.
+
+
+    Spark.currentEnclosingLandmark() - returns the 'landmark' passed
+    down the stack by the nearest enclosing call to createLandmark, or
+    if none, the nearest landmark enclosing the intended insertion
+    point, or null.
+
+
+
+    How does Meteor.form actually bind in events? (A: to the template
+    where the event was defined, for sure.) does our aroundEvent
+    scheme give us the right thing?
+
+
+    ---
+
+    XXX how do you access the form from create/render/change on
+    templates?
+  */
+
+(function () {
+
 Meteor.form = null;
 
-// XXX make deftemplate call this when a template landmark is created,
-// and merge the options into the landmark
-Templating.optionsForTemplateLandmark(function (options, t) {
-  // * 'options' is the previous options -- we are to extend it
-  // * t is, eg, Template.foo
+// XXX uses private interface
+Meteor._template_decl_methods.fields = function (fieldMap) {
+  var fields =
+    (this._tmpl_data.fields = (this._tmpl_data.field || {}));
+  _.extend(fields, fieldMap);
+};
 
-  // Preserve all fields (merge with existing preservation map)
+var formForLandmark = {}; // map from landmark id to Form
+
+// XXX others? something about 'change' not firing at the right time
+// for certain kinds of checkboxes/radio buttons on old IE?
+// http://www.quirksmode.org/dom/events/change.html
+// XXX in HTML5 you're supposed to use the 'input' event instead of
+// 'keypress'
+var inputEvents = ["keypress", "change"];
+
+var getNodeValue = function (node) {
+  // will need to special-case 'select'
+  // also, not sure how radio buttons and checkboxes work
+  // also, does this work for textareas?
+  // see valHooks in jquery to see how jquery does it
+  return node.value;
+};
+
+var setNodeValue = function (node, value) {
+  // same caveats as above
+  node.value = value;
+};
+
+Templating.optionsForTemplateLandmark(function (tmpl) {
+  var tmplData = (tmpl._tmpl_data || {});
+  var fields = tmplData.fields || {};
+
+  // Preserve all fields
   var preserve = {};
-  if (t) {
-    _.each(_.keys(t.fields || {}), function (selector) {
-      preserve[selector] = true;
-    });
-  }
-  // XXX need to normalize options.preserve -- account for the case where it
-  // is an array :(
-  _.each(options.preserve || {}, function (f, selector) {
-    preserve[selector] = f;
+  _.each(fields, function (options, selector) {
+    preserve[selector] = true;
   });
 
   // Hook create/render/destroy
-  return _.extend(_.clone(options), {
+  return {
     preserve: preserve,
     create: function () {
-      this.form = new Form(t);
-      options.create.call(this);
+      formForLandmark[this.id] = new Form(tmpl, fields);
     },
     render: function () {
-      this.form._render(this);
-      options.render.call(this);
+      formForLandmark[this.id]._render(this);
     },
     destroy: function () {
-      this.form._destroy();
-      options.destroy.call(this);
+      formForLandmark[this.id]._destroy(this);
+    },
+    // Templating extension point -- run code around HTML rendering
+    // (so we can set up Meteor.form for helpers)
+    aroundHtml: function (landmark, next) {
+      var saved = Meteor.form;
+
+      try {
+        Meteor.form = formForLandmark[landmark.id];
+        var ret = next();
+      } finally {
+        Meteor.form = saved;
+      }
+
+      return ret;
     }
-  });
+    // XXX also need an aroundEvent
+  };
 });
 
-// XXX make the handlebars engine call this around invocations of helpers
-/*
-  XXX this one's tricky. we need to have the form at helper time
-  (pre-materialize..) because we want to be able to, eg, call
-  Meteor.form.valid() to read the validation state and conditionalize
-  a CSS class on it. BUT, at that point in time, landmark matching
-  hasn't happened yet so we don't know if we have a new template or a
-  rerendered one, so we don't know what form we have..
-
-  at pre-materialize time, we DO know the branch path relative to the
-  root of the rendering. and in all cases where we're patching, we
-  also know where the rendered fragment will be inserted, so we can
-  compute the absolute branch path. so possibly we rework spark to do
-  the landmark matching before materialize?
-
-  wait, no, we don't have the relative branch path in a convenient
-  form..? after all, we build the tree from the bottom up. maybe if
-  labelbranch takes a lambda? then we could call Spark.getLandmark()
-  during pre-materialize, which will lazily match or create the
-  landmark?
- */
-/*
-  XXX need to have a hook into spark that is called around
-  renderToRegion, or when Meteor.list calls Meteor.render
-
-  use this to initialize Meteor.form at the top of a rendering
-
-  the other hook we need is inside landmark creation (at the top of a
-  template)
- */
-
-Templating.hookHelperInvocation(function (next) {
-  var saved = Meteor.form;
-
-  try {
-    Meteor.form = /* XXX find enclosing landmark??? */.form;
-    var ret = next();
-  } finally {
-    Meteor.form = saved;
-  }
-
-  return ret;
-});
-
-// XXX implement event.landmark (nearest landmark enclosing the attachEvents)
-// XXX ensure that attachEvents is inside the landmark in templates
-Spark.hookEventDelivery(function (next, event) {
-  var saved = Meteor.form;
-
-  try {
-    // this will be the form of the template that defined the event
-    // (no matter how many templates up the tree that might be)
-    if (event.landmark && event.landmark.form)
-      Meteor.form = event.landmark.form;
-    var ret = next();
-  } finally {
-    Meteor.form = saved;
-  }
-
-  return ret;
-});
-
-Form = function (template) {
+Form = function (template, fieldMap) {
   var self = this;
   self.template = template; // eg Template.foo
-
-  // User's properties ("form variables") accessible with get/set
-  self.store = new ReactiveDictionary;
-
-  // Our private state. Keys:
-  // - status; form submission status, status() return value
-  self.privateState = new ReactiveDictionary;
-  self.privateState.set("status", "ready");
-
-  // has onComplete been called? (so that submit() and cancel() are no
-  // longer allowed?)
-  self.complete = false;
 
   // 'fields' is an array of objects with keys:
   // - selector
   // - user options: name, load, save ...
   // - node: currently matching node
+  // - onchange: current event callback
+  // - handle: autorun handle for observing self.state key
   //
   // (XXX what about multiple nodes? .. we could support them, but how
   // would we set up preservation?)
   self.fields = [];
-  _.each(self.template.fields, function (options, selector) {
+  _.each(fieldMap, function (options, selector) {
     if (typeof options === "string")
       options = { name: options };
-    else
-      /* XXX verify we at least have options.name? */;
+    if (! ('name' in options))
+      throw new Error("Must provide a name for form field " + selector);
     var field = _.extend({
       load: function () {
         // XXX need to reactively get the 'options.name' key on the
         // template data.. ON THE NODE MATCHING THE
-        // SELECTOR. fortunately, we know that the node is inside our
-        // backing landmark, so we can just poll the data
-        // (getDataContext) whenever we're rerendered. (XXX no! also
-        // need to check when a child is rerendered, not just
-        // us. consider the case of a template containing an isolate
-        // containing a with containing our bound <input>. data can
-        // change without rerendering our landmark.
-        return 'XXX';
+        // SELECTOR. fortunately, we know that it can only change when
+        // we receive a 'rendered' callback.
       },
       save: function () {
         // XXX save to database, if supported by data context object?
-      }
+      },
+      selector: selector,
+      node: null
     }, options);
 
     self.fields.push(field);
   });
+
+  // User's properties ("form variables") accessible with get/set
+  self.store = new ReactiveDictionary;
 };
 
 _.extend(Form.prototype, {
@@ -165,60 +170,12 @@ _.extend(Form.prototype, {
     return this.store.equals(key, value);
   },
 
-  submit: function () {
-    if (this.privateState.equals("status", "ready")) {
-      var onSubmit = this.template.onSubmit || function (submission) {
-        // XXX write all of the fields back to the database!
-        // XXX (does that mean that this should be called save()?)
-        submission.success();
-      };
-
-      this.privateState.set("status", "submitting");
-      var setResult = false;
-      onSubmit({
-        success: function () {
-          if (!setResult) {
-            setResult = true;
-            this.privateState.set("status", "submitted");
-            this.complete = true;
-          }
-        },
-        error: function (error) {
-          if (!setResult) {
-            setResult = true;
-            // XXX add error (.. whatever type it is?) to validator messages?
-            this.privateState.set("status", "ready");
-          }
-        }
-      });
-    } else
-      /* log error? */;
-  },
-
-  cancel: function () {
-    if (! this.complete) {
-      this.complete = true;
-      this.privateState.set("status", "cancelled");
-      this.template.onCancel && this.template.onCancel();
-      this.template.onComplete && this.template.onComplete();
-    } else
-      /* log error? */;
-  },
-
-  status: function () {
-    // "ready", "submitting", "submitted", "cancelled"
-    return this.privateState.get("status");
-  },
-
-  // XXX validators
-  // XXX retrieving validator state
-
   _render: function (landmark) {
     var self = this;
 
     // update the mapping of fields to nodes
-    _.each(this.fields, function (field) {
-      var currentNode = /* find node in landmark that matches this.selector */
+    _.each(self.fields, function (field) {
+      var currentNode = landmark.find(field.selector);
       if (currentNode !== field.node) {
         self._tearDownBinding(field);
         field.node = currentNode;
@@ -228,22 +185,67 @@ _.extend(Form.prototype, {
   },
 
   _destroy: function () {
-    // XXX necessary?
-    _.each(this.fields, _.bind(self._tearDownBinding, self));
+    _.each(this.fields, _.bind(this._tearDownBinding, this));
   },
 
+  // XXX IE support
   _setUpBinding: function (field) {
-    if (!field.node)
-      return;
-    // XXX make changes to field be copied to this.store[field.name]
-    // XXX make changes to this.store[field.name] be copied to the field
-    // XXX initially populate one from the other as appropriate??
+    var self = this;
+
+    field.handle = autorun(function () {
+      setNodeValue(field.node, self.get(field.name));
+    });
+    field.onchange = function () {
+      self.set(field.name, getNodeValue(field.node));
+    };
+    _.each(inputEvents, function (type) {
+      field.node.addEventListener(type, field.onchange, false);
+    });
   },
 
+  // XXX IE support
+  // XXX jquery
   _tearDownBinding: function (field) {
-    if (!field.node)
+    if (! field.node)
       return;
-    // XXX undo _setUpBinding
+    _.each(inputEvents, function (type) {
+      field.node.removeEventListener(type, field.onchange, false);
+    });
+    field.onchange = null;
+    field.handle.stop();
+    field.handle = null;
   }
 });
 
+///////////////////////////////////////////////////////////////////////////////
+
+// XXX copied from template-demo
+
+// Run f(). Record its dependencies. Rerun it whenever the
+// dependencies change.
+//
+// Returns an object with a stop() method. Call stop() to stop the
+// rerunning.
+//
+// XXX this should go into Meteor core as Meteor.autorun
+var autorun = function (f) {
+  var ctx;
+  var slain = false;
+  var rerun = function () {
+    if (slain)
+      return;
+    ctx = new Meteor.deps.Context;
+    ctx.run(f);
+    ctx.on_invalidate(rerun);
+  };
+  rerun();
+  return {
+    stop: function () {
+      slain = true;
+      ctx.invalidate();
+    }
+  };
+};
+
+
+})();
