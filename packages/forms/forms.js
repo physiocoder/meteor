@@ -1,48 +1,9 @@
 // Generic controller for forms
 
-/*
-  XXX HERE XXX HERE
+// XXX how do you access the form from create/render/change on
+// templates? say to set initial form field values?
 
-
-  Things that stop the demo from working:
-
-  - Meteor.form is sometimes set correctly for helpers, and sometimes
-    not. It's set correctly on first template render, and if the
-    template is getting completely rerendered (an isolate that
-    encloses the whole template.) It won't be set correctly for
-    rerenders inside a template for in-retrospect-obvious reasons.
-
-  - We don't have aroundEvent so we're not even trying to set
-    Meteor.form inside events.
-
-
-    ---
-
-    Does Spark actually give us enough rope to do #1?
-
-    I suppose we want the form for the nearest enclosing landmark?
-
-    We are back in a situation where we need to know where the stuff
-    we're currently rendering is going to be inserted.
-
-
-    Spark.currentEnclosingLandmark() - returns the 'landmark' passed
-    down the stack by the nearest enclosing call to createLandmark, or
-    if none, the nearest landmark enclosing the intended insertion
-    point, or null.
-
-
-
-    How does Meteor.form actually bind in events? (A: to the template
-    where the event was defined, for sure.) does our aroundEvent
-    scheme give us the right thing?
-
-
-    ---
-
-    XXX how do you access the form from create/render/change on
-    templates?
-  */
+// XXX template-demo is broken on this branch?
 
 (function () {
 
@@ -60,9 +21,11 @@ var formForLandmark = {}; // map from landmark id to Form
 // XXX others? something about 'change' not firing at the right time
 // for certain kinds of checkboxes/radio buttons on old IE?
 // http://www.quirksmode.org/dom/events/change.html
-// XXX in HTML5 you're supposed to use the 'input' event instead of
-// 'keypress'
-var inputEvents = ["keypress", "change"];
+// XXX 'input' not supported in oldie, need onpropertychange
+// http://whattheheadsaid.com/projects/input-special-event
+// http://whattheheadsaid.com/2010/09/effectively-detecting-user-input-in-javascript
+// 'keypress' is no good -- fires before element.value changes
+var inputEvents = ["input", "change"];
 
 var getNodeValue = function (node) {
   // will need to special-case 'select'
@@ -70,12 +33,19 @@ var getNodeValue = function (node) {
   // also, does this work for textareas?
   // see valHooks in jquery to see how jquery does it
   return node.value;
+
+  // XXX under what circumstances is a string coerced to a number
 };
 
 var setNodeValue = function (node, value) {
+  if (typeof value !== "string")
+    value = ''; // XXX lots to think about here
+
   // same caveats as above
   node.value = value;
 };
+
+var formStack = [];
 
 Templating.optionsForTemplateLandmark(function (tmpl) {
   var tmplData = (tmpl._tmpl_data || {});
@@ -98,22 +68,28 @@ Templating.optionsForTemplateLandmark(function (tmpl) {
     },
     destroy: function () {
       formForLandmark[this.id]._destroy(this);
+      delete formForLandmark[this.id];
     },
-    // Templating extension point -- run code around HTML rendering
-    // (so we can set up Meteor.form for helpers)
-    aroundHtml: function (landmark, next) {
-      var saved = Meteor.form;
-
+    enter: function () {
+      console.log("enter");
+      formStack.push(Meteor.form);
+      Meteor.form = formForLandmark[this.id];
+    },
+    exit: function () {
+      console.log("exit");
+      Meteor.form = formStack.pop();
+    },
+    deliverEvent: function (next, data, event, template) {
       try {
-        Meteor.form = formForLandmark[landmark.id];
-        var ret = next();
+        console.log("begin deliver");
+        var saved = Meteor.form;
+        Meteor.form = formForLandmark[this.id]
+        next.call(this, data, event, template);
       } finally {
+        console.log("leave deliver");
         Meteor.form = saved;
       }
-
-      return ret;
     }
-    // XXX also need an aroundEvent
   };
 });
 
@@ -180,7 +156,12 @@ _.extend(Form.prototype, {
         self._tearDownBinding(field);
         field.node = currentNode;
         self._setUpBinding(field);
-      }
+      } else
+        // Patcher will have reverted the node value -- we must
+        // restore it.
+        // XXX does this break stuff? (input manager, selection?)
+        // XXX do we need special behavior on blur?
+        self._populate(field);
     });
   },
 
@@ -193,14 +174,22 @@ _.extend(Form.prototype, {
     var self = this;
 
     field.handle = autorun(function () {
-      setNodeValue(field.node, self.get(field.name));
+      self._populate(field);
     });
-    field.onchange = function () {
-      self.set(field.name, getNodeValue(field.node));
+    field.onchange = function (event) {
+      var v = getNodeValue(field.node);
+      console.log(event.type + ": set to " + JSON.stringify(v));
+      self.set(field.name, v);
+      console.log(event.type + ": done setting");
     };
     _.each(inputEvents, function (type) {
       field.node.addEventListener(type, field.onchange, false);
     });
+  },
+
+  _populate: function (field) {
+    var self = this;
+    setNodeValue(field.node, self.get(field.name));
   },
 
   // XXX IE support

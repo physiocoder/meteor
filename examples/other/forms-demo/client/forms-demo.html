@@ -13,12 +13,18 @@
   </p>
 
   {{> basicDemo }}
+  {{> basicDemo }}
+
+  <p>
+    <input type="button" class="inc" value="X++">
+  </p>
 </template>
 
 <template name="basicDemo">
   <div class="basicDemo">
-    My favorite color: <input type="text" class="color"><br>
-    The value of the field is {{color}}<br>
+    My favorite color: <input type="text" class="color"> (X={{x}})<br>
+    My favorite shape: <input type="text" class="shape"> (X={{x}})<br>
+    Its color is {{color}} and its shape is {{shape}}.<br>
     Set to:
       <input type="button" class="red" value="Red">
       <input type="button" class="blue" value="Blue">

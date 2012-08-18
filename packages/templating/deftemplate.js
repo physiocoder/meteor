@@ -148,7 +148,9 @@
             delete templateInstanceData[this.id];
           }
         ],
-        aroundHtml: []
+        enter: [],
+        exit: [],
+        deliverEvent: []
       };
 
       // Run any extensions
@@ -190,8 +192,21 @@
           var newEventMap = {};
           _.each(oldEventMap, function (handler, key) {
             newEventMap[key] = function (event, landmark) {
-              return handler.call(this, event,
-                                  templateObjFromLandmark(landmark));
+              var data = this;
+              var template = templateObjFromLandmark(landmark);
+              var deliver = function (data, event, template) {
+                return handler.call(data, event, template);
+              };
+
+              // Let extensions modify/wrap the event
+              _.each(allOptions.deliverEvent, function (hook) {
+                var previous = deliver;
+                deliver = function (data, event, template) {
+                  return hook.call(this, previous, data, event, template);
+                };
+              });
+
+              return deliver.call(landmark);
             };
           });
           return newEventMap;
@@ -209,14 +224,6 @@
         return html;
       };
 
-      // Wrap htmlFunc with any extensions
-      _.each(allOptions.aroundHtml, function (f) {
-        var oldHtmlFunc = htmlFunc;
-        htmlFunc = function (landmark) {
-          return f(landmark, _.bind(oldHtmlFunc, null, landmark));
-        };
-      });
-
       var callAll = function (what) {
         return function () {
           var self = this;
@@ -230,6 +237,8 @@
         create: callAll("create"),
         render: callAll("render"),
         destroy: callAll("destroy"),
+        enter: callAll("enter"),
+        exit: callAll("exit"),
         preserve: preserve
       }, htmlFunc);
 
