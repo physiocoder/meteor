@@ -964,7 +964,8 @@ Tinytest.add("minimongo - diff", function (test) {
         test.isFalse(new_idx < 0 || new_idx >= results.length);
         test.equal(doc, results[old_idx]);
         results.splice(new_idx, 0, results.splice(old_idx, 1)[0]);
-      }
+      },
+      trackIndices: true
     };
 
     LocalCollection._diffQuery(old_results, new_results, observer);

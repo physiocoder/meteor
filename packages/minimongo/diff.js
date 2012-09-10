@@ -1,10 +1,16 @@
 // old_results: array of documents.
 // new_results: array of documents.
 // observer: object with 'added', 'changed', 'moved',
-//           'removed' functions (each optional)
+//           'removed' functions (each optional), and trackIndices
+//           bool (required)
 // deepcopy: if true, elements of new_results that are passed to callbacks are
 //          deepcopied first
 LocalCollection._diffQuery = function (old_results, new_results, observer, deepcopy) {
+  if (!observer.trackIndices) {
+    LocalCollection._diffQueryNoIndices(old_results, new_results, observer,
+                                        deepcopy);
+    return;
+  }
 
   var new_presence_of_id = {};
   _.each(new_results, function (doc) {
@@ -241,4 +247,46 @@ LocalCollection._diffQuery = function (old_results, new_results, observer, deepc
                   bump_list);
   }
 
+};
+
+LocalCollection._diffQueryNoIndices = function (oldResults, newResults,
+                                                observer, deepcopy) {
+  if (observer.moved) {
+    Meteor._debug("_diffQueryNoIndices called with a moved observer!");
+    return;
+  }
+
+  // "maybe deepcopy"
+  var mdc = (deepcopy ? LocalCollection._deepcopy : _.identity);
+
+  var oldIndexOfId = {};
+  _.each(oldResults, function (doc, i) {
+    if (doc._id in oldIndexOfId)
+      Meteor._debug("Duplicate _id in oldResults");
+    oldIndexOfId[doc._id] = i;
+  });
+
+  var newPresenceOfId = {};
+  _.each(newResults, function (newDoc, newIndex) {
+    if (newPresenceOfId[newDoc._id])
+      Meteor._debug("Duplicate _id in newResults");
+    newPresenceOfId[newDoc._id] = true;
+
+    if (oldIndexOfId[newDoc._id] === undefined) {
+      observer.added && observer.added(mdc(newDoc));
+    } else {
+      var oldDoc = oldResults[oldIndexOfId[newDoc._id]];
+      if (!_.isEqual(oldDoc, newDoc)) {
+        // XXX Do we need to mdc(oldDoc) too?
+        observer.changed && observer.changed(mdc(newDoc), oldDoc);
+      }
+      delete oldIndexOfId[newDoc._id];
+    }
+  });
+
+  if (observer.removed) {
+    _.each(oldIndexOfId, function (old_index, id) {
+      observer.removed(oldResults[old_index]);
+    });
+  }
 };

@@ -373,6 +373,9 @@ _Mongo.Cursor.prototype.count = function () {
 //    - changed (new_object, old_object, at_index)
 //    - moved (object, old_index, new_index) - can only fire with changed()
 //    - removed (old_object, at_index)
+//  * trackIndices [default true]
+//     If false, indices will not be provided to added, changed, and
+//     removed, and moved should not be provided.
 //
 // attributes available on returned LiveResultsSet
 //  * stop(): end updates
@@ -434,6 +437,8 @@ _Mongo.LiveResultsSet = function (cursor, options) {
   self.changed = options.changed;
   self.moved = options.moved;
   self.removed = options.removed;
+  self.trackIndices =
+    options.trackIndices === undefined ? true : options.trackIndices;
 
   // run the first _poll() cycle synchronously.
   self.poll_running = true;

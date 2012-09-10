@@ -698,6 +698,11 @@ The document at position `at_index`, which was previously
 {{/dtdd}}
 </dl>
 
+Additionally, if `callbacks.trackIndices` is defined and false, no `moved`
+callbacks will be issued and the values of the `*_index` arguments to the other
+callbacks will be undefined. (This may use a more efficient algorithm, so use
+this if you don't care about indices.)
+
 `added` will immediately be called as necessary to
 deliver the initial results of the query, if any.
 

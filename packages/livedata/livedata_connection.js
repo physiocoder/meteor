@@ -166,7 +166,8 @@ Meteor._LivedataConnection = function (url, restart_on_update) {
     },
     removed: function (obj) {
       self.stream.send(JSON.stringify({msg: 'unsub', id: obj._id}));
-    }
+    },
+    trackIndices: false
   });
 };
 

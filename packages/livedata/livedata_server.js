@@ -557,7 +557,8 @@ _.extend(Meteor._LivedataSubscription.prototype, {
       removed: function (old_obj) {
         self.unset(collection, old_obj._id, _.keys(old_obj));
         self.flush();
-      }
+      },
+      trackIndices: false
     });
 
     // observe only returns after the initial added callbacks have

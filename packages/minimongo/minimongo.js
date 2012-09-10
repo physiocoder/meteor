@@ -152,6 +152,9 @@ LocalCollection.LiveResultsSet = function () {};
 //    - changed (new_object, old_object, at_index)
 //    - moved (object, old_index, new_index) - can only fire with changed()
 //    - removed (id, at_index)
+//  * trackIndices [default true]
+//     If false, indices will not be provided to added, changed, and
+//     removed, and moved should not be provided.
 //
 // attributes available on returned query handle:
 //  * stop(): end updates
@@ -199,6 +202,8 @@ LocalCollection.Cursor.prototype.observe = function (options) {
   query.changed = if_not_paused(options.changed);
   query.moved = if_not_paused(options.moved);
   query.removed = if_not_paused(options.removed);
+  query.trackIndices =
+    options.trackIndices === undefined ? true : options.trackIndices;
 
   if (!options._suppress_initial && !self.collection.paused)
     for (var i = 0; i < query.results.length; i++)
@@ -248,12 +253,14 @@ LocalCollection.Cursor.prototype._markAsReactive = function (options) {
   if (context) {
     var invalidate = _.bind(context.invalidate, context);
 
-    // XXX Maybe have an anyChange callback so that we don't need to do the full
-    // diffs if all we care about is existence of any change.
     var handle = self.observe({added: options.added && invalidate,
                                removed: options.removed && invalidate,
                                changed: options.changed && invalidate,
                                moved: options.moved && invalidate,
+                               // None of the callbacks actually pay attention
+                               // to the indices, but trackIndices also controls
+                               // whether or not the moved callback is called.
+                               trackIndices: options.moved,
                                _suppress_initial: true});
 
     // XXX in many cases, the query will be immediately
