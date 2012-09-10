@@ -50,8 +50,8 @@ Tinytest.addAsync("mongo-livedata - basics", function (test, onComplete) {
     added: function (doc, before_index) {
       log += 'a(' + doc.x + ',' + before_index + ')';
     },
-    changed: function (new_doc, at_index, old_doc) {
-      log += 'c(' + new_doc.x + ',' + at_index + ',' + old_doc.x + ')';
+    changed: function (new_doc, old_doc, at_index) {
+      log += 'c(' + new_doc.x + ',' + old_doc.x + ',' + at_index + ')';
     },
     moved: function (doc, old_index, new_index) {
       log += 'm(' + doc.x + ',' + old_index + ',' + new_index + ')';
@@ -142,14 +142,14 @@ Tinytest.addAsync("mongo-livedata - basics", function (test, onComplete) {
   test.equal(_.pluck(coll.find({run: run}, {sort: {x: -1}}).fetch(), "x"),
              [4, 1]);
 
-  expectObserve('c(3,0,1)c(6,1,4)', function () {
+  expectObserve('c(3,1,0)c(6,4,1)', function () {
     coll.update({run: run}, {$inc: {x: 2}}, {multi: true});
     test.equal(_.pluck(coll.find({run: run}, {sort: {x: -1}}).fetch(), "x"),
                [6, 3]);
   });
 
-  expectObserve(['c(13,0,3)m(13,0,1)', 'm(6,1,0)c(13,1,3)',
-                 'c(13,0,3)m(6,1,0)', 'm(3,0,1)c(13,1,3)'], function () {
+  expectObserve(['c(13,3,0)m(13,0,1)', 'm(6,1,0)c(13,3,1)',
+                 'c(13,3,0)m(6,1,0)', 'm(3,0,1)c(13,3,1)'], function () {
     coll.update({run: run, x: 3}, {$inc: {x: 10}}, {multi: true});
     test.equal(_.pluck(coll.find({run: run}, {sort: {x: -1}}).fetch(), "x"),
                [13, 6]);
@@ -189,7 +189,7 @@ Tinytest.addAsync("mongo-livedata - fuzz test", function(test, onComplete) {
       counters.add++;
       actual.splice(before_index, 0, doc.x);
     },
-    changed: function (new_doc, at_index, old_doc) {
+    changed: function (new_doc, old_doc, at_index) {
       counters.change++;
       test.equal(actual[at_index], old_doc.x);
       actual[at_index] = new_doc.x;

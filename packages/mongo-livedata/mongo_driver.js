@@ -370,7 +370,7 @@ _Mongo.Cursor.prototype.count = function () {
 // options to contain:
 //  * callbacks:
 //    - added (object, before_index)
-//    - changed (new_object, at_index)
+//    - changed (new_object, old_object, at_index)
 //    - moved (object, old_index, new_index) - can only fire with changed()
 //    - removed (old_object, at_index)
 //

@@ -956,7 +956,7 @@ Spark.list = function (cursor, itemFunc, elseFunc) {
       });
     },
 
-    changed: function (item, atIndex) {
+    changed: function (item, oldItem, atIndex) {
       later(function () {
         Spark.renderToRange(itemRanges[atIndex], _.bind(itemFunc, null, item));
       });

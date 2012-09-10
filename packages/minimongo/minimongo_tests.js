@@ -41,10 +41,10 @@ var log_callbacks = function (operations) {
       delete obj._id;
       operations.push(LocalCollection._deepcopy(['added', obj, idx]));
     },
-    changed: function (obj, at, old_obj) {
+    changed: function (obj, old_obj, at) {
       delete obj._id;
       delete old_obj._id;
-      operations.push(LocalCollection._deepcopy(['changed', obj, at, old_obj]));
+      operations.push(LocalCollection._deepcopy(['changed', obj, old_obj, at]));
     },
     moved: function (obj, old_at, new_at) {
       delete obj._id;
@@ -894,14 +894,14 @@ Tinytest.add("minimongo - observe", function (test) {
   c.insert({a:1});
   test.equal(operations.shift(), ['added', {a:1}, 0]);
   c.update({a:1}, {$set: {a: 2}});
-  test.equal(operations.shift(), ['changed', {a:2}, 0, {a:1}]);
+  test.equal(operations.shift(), ['changed', {a:2}, {a:1}, 0]);
   c.insert({a:10});
   test.equal(operations.shift(), ['added', {a:10}, 1]);
   c.update({}, {$inc: {a: 1}}, {multi: true});
-  test.equal(operations.shift(), ['changed', {a:3}, 0, {a:2}]);
-  test.equal(operations.shift(), ['changed', {a:11}, 1, {a:10}]);
+  test.equal(operations.shift(), ['changed', {a:3}, {a:2}, 0]);
+  test.equal(operations.shift(), ['changed', {a:11}, {a:10}, 1]);
   c.update({a:11}, {a:1});
-  test.equal(operations.shift(), ['changed', {a:1}, 1, {a:11}]);
+  test.equal(operations.shift(), ['changed', {a:1}, {a:11}, 1]);
   test.equal(operations.shift(), ['moved', {a:1}, 1, 0]);
   c.remove({a:2});
   test.equal(operations.shift(), undefined);
@@ -955,7 +955,7 @@ Tinytest.add("minimongo - diff", function (test) {
         test.equal(doc, results[at_idx]);
         results.splice(at_idx, 1);
       },
-      changed: function(doc, at_idx) {
+      changed: function(doc, old_doc, at_idx) {
         test.isFalse(at_idx < 0 || at_idx >= results.length);
         results[at_idx] = doc;
       },
@@ -1060,12 +1060,12 @@ Tinytest.add("minimongo - snapshot", function (test) {
   test.equal(c.find().count(), 2);
   test.equal(operations.shift(), ['added', {c:3}, 1]);
   c.update({_id: 2}, {$set: {b: 4}});
-  test.equal(operations.shift(), ['changed', {b:4}, 0, {b:2}]);
+  test.equal(operations.shift(), ['changed', {b:4}, {b:2}, 0]);
 
   c.restore();
   test.equal(c.find().count(), 2);
   test.equal(operations.shift(), ['added', {a:1}, 0]);
-  test.equal(operations.shift(), ['changed', {b:2}, 1, {b:4}]);
+  test.equal(operations.shift(), ['changed', {b:2}, {b:4}, 1]);
   test.equal(operations.shift(), ['removed', 3, 2, {c:3}]);
 
 
@@ -1115,7 +1115,7 @@ Tinytest.add("minimongo - pause", function (test) {
   c.update({_id: 1}, {a: 3});
 
   c.resumeObservers();
-  test.equal(operations.shift(), ['changed', {a:3}, 0, {a:1}]);
+  test.equal(operations.shift(), ['changed', {a:3}, {a:1}, 0]);
   test.length(operations, 0);
 
 
@@ -1145,7 +1145,7 @@ Tinytest.add("minimongo - pause", function (test) {
   test.length(operations, 0);
 
   c.resumeObservers();
-  test.equal(operations.shift(), ['changed', {c:4}, 2, {c:3}]);
+  test.equal(operations.shift(), ['changed', {c:4}, {c:3}, 2]);
   test.length(operations, 0);
 
 

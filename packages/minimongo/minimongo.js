@@ -149,9 +149,9 @@ LocalCollection.LiveResultsSet = function () {};
 // options to contain:
 //  * callbacks:
 //    - added (object, before_index)
-//    - changed (new_object, at_index, old_object)
+//    - changed (new_object, old_object, at_index)
 //    - moved (object, old_index, new_index) - can only fire with changed()
-//    - removed (id, at_index, object)
+//    - removed (id, at_index)
 //
 // attributes available on returned query handle:
 //  * stop(): end updates
@@ -165,7 +165,7 @@ LocalCollection.LiveResultsSet = function () {};
 // XXX maybe support field limiting (to limit what you're notified on)
 // XXX maybe support limit/skip
 // XXX it'd be helpful if removed got the object that just left the
-// query, not just its id
+// query, not just its id and index
 
 LocalCollection.Cursor.prototype.observe = function (options) {
   var self = this;
@@ -248,6 +248,8 @@ LocalCollection.Cursor.prototype._markAsReactive = function (options) {
   if (context) {
     var invalidate = _.bind(context.invalidate, context);
 
+    // XXX Maybe have an anyChange callback so that we don't need to do the full
+    // diffs if all we care about is existence of any change.
     var handle = self.observe({added: options.added && invalidate,
                                removed: options.removed && invalidate,
                                changed: options.changed && invalidate,
@@ -407,7 +409,7 @@ LocalCollection._removeFromResults = function (query, doc) {
 
 LocalCollection._updateInResults = function (query, doc, old_doc) {
   var orig_idx = LocalCollection._findInResults(query, doc);
-  query.changed(LocalCollection._deepcopy(doc), orig_idx, old_doc);
+  query.changed(LocalCollection._deepcopy(doc), old_doc, orig_idx);
 
   if (!query.sort_f)
     return;
