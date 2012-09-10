@@ -299,19 +299,12 @@ _Mongo.Cursor = function (mongo, collection_name, selector, options, cursor) {
 _Mongo.Cursor.prototype.forEach = function (callback) {
   var self = this;
 
-  var wrappedNextObject = Future.wrap(self.cursor.nextObject.bind(self.cursor));
-
   // We implement the loop ourself instead of using self.cursor.each, because
   // "each" will call its callback outside of a fiber which makes it much more
   // complex to make this function synchronous.
   while (true) {
-    var doc = wrappedNextObject().wait();
-    if (!doc || !doc._id)
-      return;
-    // Have we already seen this doc (Mongo cursors can return duplicates)?
-    if (self.visited_ids[doc._id])
-      continue;
-    self.visited_ids[doc._id] = true;
+    var doc = self.nextObject();
+    if (!doc) return;
     callback(doc);
   }
 };
@@ -335,6 +328,18 @@ _Mongo.Cursor.prototype.rewind = function () {
   self.cursor.rewind();
 
   self.visited_ids = {};
+};
+
+_Mongo.Cursor.prototype.nextObject = function () {
+  var self = this;
+  var wrappedNextObject = Future.wrap(self.cursor.nextObject.bind(self.cursor));
+  while (true) {
+    var doc = wrappedNextObject().wait();
+    if (!doc || !doc._id) return null;
+    if (self.visited_ids[doc._id]) continue;
+    self.visited_ids[doc._id] = true;
+    return doc;
+  }
 };
 
 _Mongo.Cursor.prototype.fetch = function () {
@@ -406,6 +411,7 @@ _Mongo.LiveResultsSet = function (cursor, options) {
   self.pending_writes = []; // people to notify when polling completes
   self.poll_running = false; // is polling in progress now?
   self.polling_suspended = false; // is polling temporarily suspended?
+  self.doPollReentryState = 0;
 
   // (each instance of the class needs to get a separate throttling
   // context -- we don't want to coalesce invocations of markDirty on
@@ -485,18 +491,40 @@ _Mongo.LiveResultsSet.prototype._resumePolling = function() {
   this._unthrottled_markDirty(); // poll NOW, don't wait
 };
 
-
+// _diffQuery can yield when it calls fetchMoreNewResults, but we want to finish
+// each diff run before starting the next. So we use a variable
+// doPollReentryState to track if _doPoll has been called while another call is
+// running; if so, we make sure to re-diff once the first diff is done.
+//
+// Values of doPollReentryState:
+//   - 0: _diffQuery is not running
+//   - 1: _diffQuery is running and another call to _doPoll hasn't occured
+//   - 2: _diffQuery is running and another call to _doPoll has occured
 _Mongo.LiveResultsSet.prototype._doPoll = function () {
   var self = this;
 
-  // Get the new query results
-  self.cursor.rewind();
-  var new_results = self.cursor.fetch();
-  var old_results = self.results;
+  if (self.doPollReentryState != 0) {
+    self.doPollReentryState = 2;
+    return;
+  }
 
-  LocalCollection._diffQuery(old_results, new_results, self, true);
-  self.results = new_results;
+  self.doPollReentryState = 1;
 
+  while (self.doPollReentryState === 1) {
+    self.cursor.rewind();
+    var old_results = self.results;
+    var new_results = [];
+    var fetchMoreNewResults = function () {
+      var doc = self.cursor.nextObject();
+      if (!doc) return false;
+      new_results.push(doc);
+      return true;
+    };
+    LocalCollection._diffQuery(old_results, new_results, self, true,
+                               fetchMoreNewResults);
+    self.results = new_results;
+    self.doPollReentryState = (self.doPollReentryState === 2 ? 1 : 0);
+  }
 };
 
 _Mongo.LiveResultsSet.prototype.stop = function () {
