@@ -330,6 +330,8 @@ _Mongo.Cursor.prototype.rewind = function () {
   self.visited_ids = {};
 };
 
+// XXX make this _internal because we aren't implementing it in the client
+// XXX save Future.wrap return value somewhere.
 _Mongo.Cursor.prototype.nextObject = function () {
   var self = this;
   var wrappedNextObject = Future.wrap(self.cursor.nextObject.bind(self.cursor));
