@@ -4,7 +4,7 @@ Package.describe({
 });
 
 Package.on_use(function (api) {
-  api.use(['backbone']); // XXX temporary hack
   api.use(['spark']);
+  api.use(['jquery']); // XXX eliminate
   api.add_files('pages.js', 'client');
 });

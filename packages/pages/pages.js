@@ -1,44 +1,52 @@
 (function () {
 
+var USE_PUSHSTATE = window.history && window.history.pushState;
+
 // XXX make server-side rendering work
 // XXX if no pushstate fall back to hard page loads
 //  => do we clear session? do we force-clear session even if we have pushstate?
 //  => maybe we save session into pushstate storage, to restore selected tab
 //     etc (on supporting browsers only??)
 
-// XXX eliminate backbone dependency as soon as I have net again
-
 var pageTable = Meteor._pageTable = {};
 var currentPage = null;
 var currentPageListeners = {};
 
-// XXX history gets broken on 404, because we are effectively
-// redirecting (because we reinvoke our callback on every page change,
-// including to the 404 page). fix.
+///////////////////////////////////////////////////////////////////////////////
 
-//XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+var transitionToPath = function (path) {
+  var where = decodePath(path);
+  if (! where)
+    where = { page: "notFound" }; // XXX hack
+  // XXX also need to handle the lack of even a 404 page -- probably,
+  // Meteor.page is null, and we render a default 404 page.
 
+  currentPage = where.page;
+  _.each(_.keys(currentPageListeners), function (id) {
+    currentPageListeners[id].invalidate();
+  });
 
-var MyRouter = Backbone.Router.extend({
-  routes: {
-    "*path": "page_from_path"
-  },
-  page_from_path: function (path) {
-    path = "/" + path;
-    var where = decodePath(path);
-    if (! where)
-      where = { page: "notFound" }; // XXX hack
-    Meteor.go(where.page, where.params);
-  }
-});
+  // XXX set other keys in session
+  // (also clear any keys left over from last time)
 
-Router = new MyRouter;
+  // XXX XXX jquery
+  // XXX think through scrolling handling (consider fragments too..)
+  Meteor.defer(function() {
+    $("html, body").scrollTop(0);
+  });
+};
 
 Meteor.startup(function () {
-  Backbone.history.start({pushState: true});
+  transitionToPath(document.location.pathname);
 });
 
-//XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+if (USE_PUSHSTATE) {
+  window.addEventListener('popstate', function () {
+    transitionToPath(document.location.pathname);
+  });
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 // map from page name to:
 // - path: url pattern (eg, /event/:slug)
@@ -111,32 +119,46 @@ Meteor.page = function () {
   return currentPage;
 };
 
+// Navigate to a new page. This is called only when the user triggers
+// navigation through the app (or potentially by clicking a link), not
+// in response to the user typing into the address bar or pressing
+// forward or back.
 Meteor.go = function (page, params) {
-  // XXX temporary hack -- in future should use pushstate, etc
-  if (! (page in pageTable)) {
-    page = "notFound"; // XXX hack
-    // XXX also need to handle the lack of even a 404 page --
-    // probably, Meteor.page is null, and we render a default 404
-    // page.
+  var path = encodePath(page, params);
+  // XXX XXX need to handle 404! maybe throw an exception?
+
+  if (path === document.location.pathname)
+    return; // XXX correct policy?
+
+  if (! USE_PUSHSTATE) {
+    window.location.assign(path);
+    // not reached
+    return;
   }
-  currentPage = page;
-  _.each(_.keys(currentPageListeners), function (id) {
-    currentPageListeners[id].invalidate();
-  });
 
-  // XXX XXX jquery
-  // XXX think through scrolling handling (consider fragments too..)
-  Meteor.defer(function() {
-    $("html, body").scrollTop(0);
-  });
-
-  // XXX we both call and are called by the router?? straighten this out...
-  Router.navigate(encodePath(page, params), true);
+  transitionToPath(path);
+  window.history.pushState({}, document.title, path);
 };
 
 // options: 'absolute' (true for absolute url, default false)
+//
+// XXX should also be available on the server! for example, to
+// generate a link for email. which means that page declarations go on
+// the server too?
+//
+// ... which parts of an app DON'T go on the server? if we just say
+// that startup() doesn't run on the server (or rather it's called
+// something different there), and that events only fire on the
+// client, can we basically eliminate the distinction between the
+// client and the server, except for server code that you want to hide
+// for security reasons (or bundle size), and legacy/special purpose
+// client code that wants to run at top level?
 Meteor.url = function (page, params, options) {
-  throw new Error("Not implemented");
+  var ret = encodePath(page, params);
+  if (options.absolute)
+    // XXX prepend with absolute URL
+    throw new Error("Not implemented");
+  return ret;
 };
 
 // XXX make this be overridden by <body>, if present; but allow <body>
@@ -180,8 +202,46 @@ Meteor.startup(function () {
   document.body.appendChild(frag);
 });
 
-// XXX listen for anchor clicks, turn into 'go' actions iff they match
-// a defined page
+// Catch clicks on links and handle through pushstate if possible
+if (USE_PUSHSTATE) {
+  Meteor.startup(function () {
+    // XXX XXX jquery
+    $('body').delegate('a', 'click', function (evt) {
 
+      if (evt.shiftKey || evt.ctrlKey || evt.metaKey) return true;
+
+      var href = $(this).attr('href');
+
+      // IE renders relative URLs as absolute; make href relative if
+      // it should be
+      var prefix = window.location.protocol + "//" + window.location.hostname;
+      if (href && href.indexOf(prefix) === 0)
+        href = href.substring(prefix.length);
+
+      // XXX XXX I suspect that we still need to 'absolutify' paths
+      // .. eg '<a href="2">' => /pages/2
+
+      // XXX when the link doesn't match a page, maybe should fall back
+      // to a hard page load in case it matches a page somewhere else on
+      // the server? that is, don't assume we own the whole URL space
+      // for the domain where we're running?
+
+      if (href && ! /^\w+:/.exec(href)) {
+        // relative href
+
+        if (href === document.location.pathname) {
+          evt.preventDefault();
+          return; // XXX correct policy?
+        }
+
+        var where = decodePath(href);
+        if (where) {
+          evt.preventDefault();
+          Meteor.go(where.page, where.params);
+        }
+      };
+    });
+  });
+}
 
 })();
