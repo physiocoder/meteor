@@ -562,10 +562,6 @@ _.extend(Bundle.prototype, {
                      self._generate_app_html());
     dependencies_json.core.push('lib/app.html.in');
 
-    fs.writeFileSync(path.join(build_path, 'unsupported.html'),
-                     fs.readFileSync(path.join(__dirname, "unsupported.html")));
-    dependencies_json.core.push('lib/unsupported.html');
-
     // --- Documentation, and running from the command line ---
 
     fs.writeFileSync(path.join(build_path, 'main.js'),

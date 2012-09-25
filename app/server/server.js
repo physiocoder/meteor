@@ -10,7 +10,6 @@ var gzippo = require('gzippo');
 var argv = require('optimist').argv;
 var mime = require('mime');
 var handlebars = require('handlebars');
-var useragent = require('useragent');
 
 // this is a copy of underscore that will be shipped just for use by
 // this file, server.js.
@@ -35,16 +34,6 @@ var init_keepalive = function () {
       process.exit(1);
     }
   }, 3000);
-};
-
-var supported_browser = function (user_agent) {
-  return true;
-
-  // For now, we don't actually deny anyone. The unsupported browser
-  // page isn't very good.
-  //
-  // var agent = useragent.lookup(user_agent);
-  // return !(agent.family === 'IE' && +agent.major <= 5);
 };
 
 // add any runtime configuration options needed to app_html
@@ -109,12 +98,10 @@ var run = function () {
       require('vm').runInThisContext(code, filename, true);
     });
 
-
     // Actually serve HTML. This happens after user code, so that
     // packages can insert connect middlewares and update
     // __meteor_runtime_config__
     var app_html = fs.readFileSync(path.join(bundle_dir, 'app.html'), 'utf8');
-    var unsupported_html = fs.readFileSync(path.join(bundle_dir, 'unsupported.html'));
 
     app_html = runtime_config(app_html);
 
@@ -127,10 +114,7 @@ var run = function () {
       }
 
       res.writeHead(200, {'Content-Type': 'text/html'});
-      if (supported_browser(req.headers['user-agent']))
-        res.write(app_html);
-      else
-        res.write(unsupported_html);
+      res.write(app_html);
       res.end();
     });
 
