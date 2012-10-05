@@ -4,6 +4,9 @@
     var label = null;
 
     if (n.nodeType === 1 /*ELEMENT_NODE*/) {
+      if (n.nodeName === 'INPUT' && n.type === 'submit')
+        return false;
+
       if (n.id) {
         label = '#' + n.id;
       } else if (n.getAttribute("name")) {
