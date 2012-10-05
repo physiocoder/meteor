@@ -39,19 +39,24 @@
       {{> forgotPasswordForm}}
       {{else}}
       <div class="login-form login-password-form">
+
+        {{! Use a real form to make save password features work.
+            Note this does not work in Safari because we stop the form
+            from submitting with 'return false'. Chrome is even more
+            demanding, it requires that the elements to be remember are
+            present in the inital HTML, not inserted with javascript.
+            https://gist.github.com/968927
+        }}
+        <form target="nosuch" action="nosuch" onsubmit="return false;">
+
         {{#each fields}}
           {{> loginButtonsFormField}}
         {{/each}}
 
         {{> loginButtonsMessages}}
 
-        <div class="login-button login-button-form-submit" id="login-buttons-password">
-          {{#if inSignupFlow}}
-          Create account
-          {{else}}
-          Sign in
-          {{/if}}
-        </div>
+        <input type="submit" class="login-button login-button-form-submit" id="login-buttons-password" value="{{#if inSignupFlow}}Create account{{else}}Sign in{{/if}}"> {{!XXX XXX}}
+        </form>
 
         {{#if inLoginFlow}}
         <div class="additional-link-container">
@@ -86,7 +91,7 @@
   <label id="login-{{fieldName}}-label" for="login-{{fieldName}}">
     {{fieldLabel}}
   </label>
-  <input id="login-{{fieldName}}" type="{{inputType}}" />
+  <input id="login-{{fieldName}}" name="login-{{fieldName}}" type="{{#if inputType}}{{inputType}}{{else}}text{{/if}}" />
 </template>
 
 <template name="loginButtonsMessages">
