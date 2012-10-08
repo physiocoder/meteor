@@ -67,7 +67,8 @@ Meteor.startup(function () {
 });
 
 var toc = [
-  {name: "Meteor " + METEOR_VERSION, id: "top"}, [
+  {name: "Meteor " + METEOR_VERSION, linkId: "top", headingClass: 'main-headline',
+   content: 'introtop'}, [
     "Quick start",
     "Seven principles",
     "Resources"
@@ -245,7 +246,7 @@ var name_to_id = function (name) {
   return x;
 };
 
-Template.nav.sections = function () {
+var getSections = function () {
   var ret = [];
   var walk = function (items, depth) {
     _.each(items, function (item) {
@@ -256,7 +257,8 @@ Template.nav.sections = function () {
           item = {name: item};
         ret.push(_.extend({
           type: "section",
-          id: item.name && name_to_id(item.name) || undefined,
+          id: ((! item.linkId) &&
+               item.name && name_to_id(item.name) || undefined),
           depth: depth,
           style: ''
         }, item));
@@ -266,6 +268,14 @@ Template.nav.sections = function () {
 
   walk(toc, 1);
   return ret;
+};
+
+Template.nav.sections = function () {
+  var sections = getSections();
+  _.each(sections, function (sec) {
+    sec.id = (sec.linkId || sec.id);
+  });
+  return sections;
 };
 
 Template.nav.type = function (what) {
@@ -299,9 +309,8 @@ Handlebars.registerHelper('dtdd', function(name, options) {
                                type: options.hash.type});
 });
 
-Handlebars.registerHelper('better_markdown', function(fn) {
+var betterMarkdown = function (input) {
   var converter = new Showdown.converter();
-  var input = fn(this);
 
   ///////
   // Make Markdown *actually* skip over block-level elements when
@@ -406,6 +415,11 @@ Handlebars.registerHelper('better_markdown', function(fn) {
   output = output.replace(/<!--(\/?\$.*?)-->/g, '<$1>');
 
   return output;
+};
+
+Handlebars.registerHelper('better_markdown', function(fn) {
+  var input = fn(this);
+  return betterMarkdown(input);
 });
 
 Handlebars.registerHelper('dstache', function() {
@@ -423,6 +437,10 @@ Handlebars.registerHelper('api_section', function(id, nameFn) {
 
 Handlebars.registerHelper('api_box_inline', function(box, fn) {
   return Template.api_box(_.extend(box, {body: fn(this)}), true);
+});
+
+Handlebars.registerHelper('apibox', function (fn) {
+  return Template.api_box(eval('(' + fn(this) + ')'));
 });
 
 Template.api_box.bare = function() {
@@ -466,3 +484,32 @@ var check_links = function() {
 
   return "DONE";
 };
+
+Handlebars.registerHelper("generateDocs", function () {
+  var sections = getSections().slice(0, 1); // XXX
+
+  var html = [];
+
+  _.each(sections, function (item) {
+    var hLevel =  String(item.depth);
+    var hId = item.id;
+    var hClass = item.headingClass;
+    var hContent = item.heading || item.name;
+    html.push('<h', hLevel);
+    if (hId)
+      html.push(' id="', Handlebars._escape(hId), '"');
+    if (hClass)
+      html.push(' class="', Handlebars._escape(hClass), '"');
+    html.push('>');
+    html.push(Handlebars._escape(hContent));
+    html.push('</h', hLevel, '>\n');
+
+    var contentTemplateName = 'doc_' + (item.content || item.id);
+    var contentTemplate = Template[contentTemplateName];
+
+    if (contentTemplate)
+      html.push(betterMarkdown(contentTemplate()));
+  });
+
+  return new Handlebars.SafeString(html.join(''));
+});

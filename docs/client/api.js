@@ -1,10 +1,3 @@
-Template.api.isClient = {
-  id: "meteor_isclient",
-  name: "Meteor.isClient",
-  locus: "Anywhere",
-  descr: ["Boolean variable.  True if running in client environment."]
-};
-
 Template.api.isServer = {
   id: "meteor_isserver",
   name: "Meteor.isServer",
@@ -996,4 +989,3 @@ Template.api.email_send = {
     }
   ]
 };
-

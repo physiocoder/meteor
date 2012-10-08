@@ -303,6 +303,7 @@ dl.callbacks dt .name, dl.methods dt .name {
     border-color: #ccc;
     padding-top: 2em;
     margin-bottom: 1em;
+    background: red;
 }
 
 .bareapi {
@@ -442,3 +443,5 @@ pre {
     display: block;
 }
 }
+
+#introduction { border: 1px solid red; }

@@ -10,7 +10,15 @@ available just on the client, just on the server, or *Anywhere*.
 
 <h2 id="core"><span>Meteor Core</span></h2>
 
-{{> api_box isClient}}
+{{#apibox}}
+{
+  id: "meteor_isclient",
+  name: "Meteor.isClient",
+  locus: "Anywhere",
+  descr: ["Boolean variable.  True if running in client environment."]
+}
+{{/apibox}}
+
 {{> api_box isServer}}
 {{> api_box startup}}
 
