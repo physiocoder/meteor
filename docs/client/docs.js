@@ -1,7 +1,8 @@
 METEOR_VERSION = "0.4.2";
 
 Meteor.startup(function () {
-  Meteor.call('reportPageHtml', Template.page());
+  if (/^localhost:/.test(window.location.host))
+    Meteor.call('reportPageHtml', Template.page());
 
 
   // XXX this is broken by the new multi-page layout.  Also, it was
