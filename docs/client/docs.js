@@ -69,7 +69,7 @@ Meteor.startup(function () {
 var toc = [
   {name: "Meteor " + METEOR_VERSION, linkId: "top", headingClass: 'main-headline',
    content: 'introtop'}, [
-    "Quick start",
+     {name: "Quick start", heading: "Quick start!"},
     "Seven principles",
     "Resources"
   ],
@@ -486,16 +486,21 @@ var check_links = function() {
 };
 
 Handlebars.registerHelper("generateDocs", function () {
-  var sections = getSections().slice(0, 1); // XXX
+  var sections = getSections().slice(0, 2); // XXX
 
   var html = [];
 
   _.each(sections, function (item) {
+    if (item.type === 'spacer') {
+      console.log("SPACER"); // XXX
+      return;
+    }
+
     var hLevel =  String(item.depth);
     var hId = item.id;
     var hClass = item.headingClass;
     var hContent = item.heading || item.name;
-    html.push('<h', hLevel);
+    html.push('\n<h', hLevel);
     if (hId)
       html.push(' id="', Handlebars._escape(hId), '"');
     if (hClass)
@@ -509,6 +514,8 @@ Handlebars.registerHelper("generateDocs", function () {
 
     if (contentTemplate)
       html.push(betterMarkdown(contentTemplate()));
+    else
+      console.log('No template "' + contentTemplateName + '"');
   });
 
   return new Handlebars.SafeString(html.join(''));
