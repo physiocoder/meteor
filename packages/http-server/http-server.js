@@ -1,10 +1,50 @@
 // XXX depend on a dummy ArrayBuffer package
 // XXX align names with our http client API
 // XXX let the user control what we gzip
+// XXX pattern for query string parsing
+// XXX http vs https, 80 vs 443 (X-Forwarded-Proto)
 
 (function () {
 
-HttpServer = {};
+var Future = __meteor_bootstrap__.require('fibers/future');
+// js2-mode AST blows up when parsing 'future.return()', so alias.
+Future.prototype.ret = Future.prototype.return;
+
+HttpServer = function () {
+  var self = this;
+
+  self._nextListenerId = 1;
+  self._listeners = {}; // listener id => listener
+
+  __meteor_bootstrap__.app.use(function (req, res, next) {
+    var ids = _.keys(self.listeners);
+
+    for (var i = 0; i < ids.length; i++) {
+      var listener = self.listeners[id];
+      if (! listener)
+        continue;
+
+      // XXX need to test host (they could be sending weird traffic at us..)
+      // XXX and need to somehow get port (I guess from PORT)
+
+      if (! listener.urlPattern.test(req.url))
+        continue;
+
+      // Found the correct handler. Note that we don't allow the
+      // handler to decline the request. That's because in a real
+      // deploy, that would potentially involve returning the request
+      // to the reverse proxy tier and asking it to redispatch it,
+      // which seems unreasonable.
+
+      // XXX need to dispatch inside a thread
+      handler(new HttpRequest(req, res));
+      return;
+    }
+
+    // XXX serve 404?
+    next();
+  });
+};
 
 /**
  * Listen for HTTP requests that match a pattern.
@@ -22,7 +62,9 @@ HttpServer = {};
  * "mydomain.com:1234". If no port is provided it defaults to 80. No
  * IDNA encoding is * performed, so if you want to listen on a
  * hostname that contains * characters other than letters, digits, and
- * hyphens, you will need * to perform the IDNA encoding yourself.
+ * hyphens, you will need * to perform the IDNA encoding yourself. No
+ * distinction is made between listening for http and for https (this
+ * is considered an operational question.)
  *
  * @param {RegExp} urlPattern The URL pattern to listen for. The URL
  * will be formatted as a relative URL beginning with a '/', for
@@ -44,21 +86,53 @@ HttpServer = {};
  * hook to let your code reject such a request after looking at the
  * headers, rather than telling the client to send the request body.
  *
- * XXX specify what happens if multiple match
+ * XXX specify what happens if multiple match (XXX need to solve this
+ * so we can server 404's)
  */
 
-HttpServer.listen = function (host, urlPattern, handler) {
+HttpServer.prototype.listen = function (host, urlPattern, handler) {
+  var self = this;
+  var id = self._nextListenerId ++;
+
+  // XXX for now: check to see if host matches where we are
+  // listening. if not, throw an exception. (in the future the
+  // intention is that this will automatically register this process
+  // with your reverse proxy tier, using a credential that this
+  // process was given by the deploy tool)
+
+  // XXX process.env.ROOT_URL is 'http(s)://mysite.com:3000'
+  // no port if 80 or 443 (as appropriate)
+  // or could be 'http://1.1.1.1'
+  // need to special-case localhost === 127.0.0.1
+  // otherwise, if you're typing an IP in the address bar, you get what you get
+
+  var pattern = new RegExp('^' + urlPattern.pattern,
+                           urlPattern.ignoreCase ? 'i' : '');
+
+  self._listeners[id] = {
+    host: host,
+    urlPattern: pattern,
+    handler: handler
+  };
+
+  return {
+    stop: function () {
+      delete self._listeners[id];
+    }
+  };
 };
 
 /**
  * Represents an inbound HTTP request (as delivered by
  * HttpServer.listen.)
  */
-HttpServer.Request = function (method, host, url, headers) {
+HttpRequest = function (req, res) {
+  var self = this;
+
   /**
    * {String} The HTTP verb, such as 'GET' or 'POST'.
    */
-  this.method = method;
+  self.method = req.method;
 
   /**
    * {String} The host where the request was received, possibly
@@ -67,18 +141,27 @@ HttpServer.Request = function (method, host, url, headers) {
    * HttpServer.listen, this will never be an IP address and will
    * never contain a "*" wildcard.
    */
-  this.host = host;
+  self.host = XXX host;
 
   /**
    * {String} The URL requested, such as '/' or '/mypage?thing=1'.
    */
-  this.url = url;
+  self.url = req.url;
+
+  /**
+   * {Boolean} True if the request came in over HTTPS, else
+   * false. This is based in part on the X-Forwarded-Proto header. If
+   * you need to trust `secure`, then you need to make sure that users
+   * can't reach your app without going through a reverse proxy tier
+   * that strips out user attempts to set this header.
+   */
+  self.secure = false; // XXX need to parse X-Forwarded-Proto (http or https)
 
   /**
    * {String} The HTTP protocol version used for the request, such as
    * '1.1'.
    */
-  this.httpVersion = httpVersion;
+  self.httpVersion = req.httpVersion;
 
   /**
    * {Object} The request headers, as a map from strings to
@@ -88,7 +171,7 @@ HttpServer.Request = function (method, host, url, headers) {
    * calling read()/readString() to include any trailers that are sent
    * after the last chunk.)
    */
-  this.headers = headers;
+  self.headers = _.extend({}, req.headers);
 
   /**
    * {Boolean} True if the "chunked" encoding will be used to send the
@@ -103,7 +186,7 @@ HttpServer.Request = function (method, host, url, headers) {
    * Also when chunkedResponse is false, it is an error to pass
    * headers ("trailers") to `end`.
    */
-  this.chunkedResponse = (this.httpVersion === "1.1");
+  self.chunkedResponse = (self.httpVersion === "1.1");
 
   /**
    * {Boolean} True if an error occurred (for example, the client
@@ -111,10 +194,73 @@ HttpServer.Request = function (method, host, url, headers) {
    * response, meaning that there is no point in calling functions
    * like write().
    */
-  this.error = false;
+  self.error = false;
+
+  self._req = req;
+  self._res = res;
+  self._readCalled = false;
+
+  self._req.pause(); // wait for read() to be called
 };
 
-_.extend(HttpServer.Request.prototype, {
+_.extend(HttpRequest.prototype, {
+  _readRaw: function (callback, convert, concat) {
+    var self = this;
+    var parts = [];
+    var future = new Future;
+
+    if (self._readCalled)
+      throw new Error("read() should only be called once on each HttpRequest");
+    self._readCalled = true;
+
+    if (self.error)
+      return;
+
+    self._req.on('data', function (data) {
+      if (! future)
+        return;
+
+      if (callback) {
+        if (callback(convert(data)) === false) {
+          // we've been asked to stop reading
+          self._req.connection.destroy();
+          self.error = true;
+          future.ret();
+        }
+      } else
+        parts.push(data);
+    });
+
+    self._req.on('end', function () {
+      if (! future)
+        return;
+
+      future.ret();
+    });
+
+    // 'close' is called if we lose the TCP connection before we are
+    // totally done (before we've called end() on the respone)
+    self._req.on('close', function () {
+      // can continue to be called after read() has returned
+      self.error = true;
+      if (future)
+        future.ret();
+    });
+
+    // run until 'end' or 'close'
+    self._req.resume();
+    future.wait();
+    future = null; // prevent further callbacks (except 'close')
+
+    if (self.error)
+      return false;
+
+    if (callback)
+      return true;
+    else
+      return convert(Buffer.concat(parts));
+  },
+
   /**
    * Read the contents of the request body. If no `callback` is
    * provided, the contents of the body are read off of the network
@@ -138,6 +284,22 @@ _.extend(HttpServer.Request.prototype, {
    * default value
    */
   read: function (callback) {
+    var self = this;
+
+    return self._readRaw(
+      function (buffer) {
+        // XXX we actually have to copy the data from the node.js
+        // Buffer into the W3C ArrayBuffer. at some point we'll want
+        // to write C code to avoid the copy, if the node guys don't
+        // get there first.
+        var ret = new ArrayBuffer(buffer.length);
+        var retTyped = new Uint8Array(ret);
+        var len = buffer.length;
+        for (var i = 0; i < len; i++)
+          retTyped[i] = buffer[i];
+        return ret;
+      }
+    );
   },
 
   /**
@@ -149,6 +311,19 @@ _.extend(HttpServer.Request.prototype, {
    * the HTTP default of ISO-8859-1 will be used.
    */
   readString: function (callback) {
+    var self = this;
+
+    var encoding = /* XXX determine HTTP encoding */;
+
+    // XXX may have to resort to iconv if we actually want to support
+    // ISO-8859-1.. but why? can't we just legislate that the client
+    // will use utf8?
+
+    return self._readRaw(
+      function (buffer) {
+        return buffer.toString(/* XXX node encoding */);
+      }
+    );
   },
 
   /**
@@ -187,6 +362,13 @@ _.extend(HttpServer.Request.prototype, {
    * reason, this may be removed in the future.)
    */
   begin: function (statusCode, reasonPhrase, headers) {
+    var self = this;
+
+    // Make sure the 'close' callback is set up
+    if (! self._readCalled)
+      self.read();
+
+    // XXX use writeHead
   },
 
   /**
@@ -225,6 +407,9 @@ _.extend(HttpServer.Request.prototype, {
   end: function (headers) {
   }
 });
+
+// Singleton
+HttpServer = new HttpServer;
 
 })();
 

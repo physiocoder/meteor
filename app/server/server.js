@@ -72,7 +72,9 @@ var run = function () {
   var info = JSON.parse(info_raw);
 
   // start up app
-  __meteor_bootstrap__ = {require: require, startup_hooks: [], app: app};
+  __meteor_bootstrap__ = {
+    require: require,
+    startup_hooks: [], app: app};
   __meteor_runtime_config__ = {};
   Fiber(function () {
     // (put in a fiber to let Meteor.db operations happen during loading)
