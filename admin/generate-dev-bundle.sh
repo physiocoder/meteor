@@ -97,6 +97,7 @@ npm install stream-buffers@0.2.3
 npm install keypress@0.1.0
 npm install sockjs@0.3.4
 npm install http-proxy@0.8.5
+npm install blade@2.0
 
 # progress 0.1.0 has a regression where it opens stdin and thus does not
 # allow the node process to exit cleanly. See
