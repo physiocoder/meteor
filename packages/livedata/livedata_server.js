@@ -6,7 +6,6 @@
 
 Meteor._SessionDocumentView = function (id) {
   var self = this;
-  self.id = id;
   self.existsIn = {}; // set of subId
   self.dataByKey = {}; // key-> [ {subscriptionId, value} by precedence]
 };
@@ -41,12 +40,12 @@ _.extend(Meteor._SessionDocumentView.prototype, {
 
   changeField: function (subscriptionId, key, value, changeCollector, isAdd) {
     var self = this;
-    var precedenceList = self.dataByKey[key];
-    if (!precedenceList) {
+    if (!_.has(self.dataByKey, key)) {
       self.dataByKey[key] = [{subscriptionId: subscriptionId, value: value}];
       changeCollector[key] = value;
       return;
     }
+    var precedenceList = self.dataByKey[key];
     var elt;
     if (!isAdd)
       elt = _.find(precedenceList, function (precedence) {
@@ -410,7 +409,7 @@ _.extend(Meteor._LivedataSession.prototype, {
           processNext();
         };
 
-        if (msg.msg in self.protocol_handlers)
+        if (_.has(self.protocol_handlers, msg.msg))
           self.protocol_handlers[msg.msg].call(self, msg, unblock);
         else
           self.sendError('Bad request', msg);
@@ -440,7 +439,7 @@ _.extend(Meteor._LivedataSession.prototype, {
         return;
       }
 
-      if (msg.id in self.named_subs)
+      if (_.has(self.named_subs, msg.id))
         // subs are idempotent, or rather, they are ignored if a sub
         // with that id already exists. this is important during
         // reconnect.
@@ -487,7 +486,7 @@ _.extend(Meteor._LivedataSession.prototype, {
 
       // check for a replayed method (this is important during
       // reconnect)
-      if (msg.id in self.result_cache) {
+      if (_.has(self.result_cache, msg.id)) {
         // found -- just resend whatever we sent last time
         var payload = _.clone(self.result_cache[msg.id]);
         delete payload.when;
