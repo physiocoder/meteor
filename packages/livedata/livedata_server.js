@@ -13,6 +13,9 @@ Meteor._SessionDocumentView = function (id) {
 _.extend(Meteor._SessionDocumentView.prototype, {
   clearField: function (subscriptionId, key, changeCollector, clearCollector) {
     var self = this;
+    // Publish API ignores _id if present in fields
+    if (key === "_id")
+      return;
     var precedenceList = self.dataByKey[key];
     if (!precedenceList) {
       throw new Error("Could not find field to clear " + key);
@@ -40,6 +43,9 @@ _.extend(Meteor._SessionDocumentView.prototype, {
 
   changeField: function (subscriptionId, key, value, changeCollector, isAdd) {
     var self = this;
+    // Publish API ignores _id if present in fields
+    if (key === "_id")
+      return;
     if (!_.has(self.dataByKey, key)) {
       self.dataByKey[key] = [{subscriptionId: subscriptionId, value: value}];
       changeCollector[key] = value;
@@ -104,7 +110,8 @@ _.extend(Meteor._SessionCollectionView.prototype, {
       self.documents[id] = docView;
       docView.existsIn[subscriptionId] = true;
       _.each(fields, function (value, key) {
-        docView.dataByKey[key] = [{subscriptionId: subscriptionId, value: value}];
+        if (key !== "_id")
+          docView.dataByKey[key] = [{subscriptionId: subscriptionId, value: value}];
       });
       // since nobody else knew about this doc, we can just call added.
       self.callbacks.added(self.collectionName, id, fields);
@@ -698,10 +705,10 @@ _.extend(Meteor._LivedataSubscription.prototype, {
     this._stopCallbacks.push(callback);
   },
 
-  added: function (collectionName, document) {
+  added: function (collectionName, id, fields) {
     var self = this;
-    Meteor._ensure(self._documents, collectionName)[document._id] = true;
-    self._session.added(self._subscriptionId, collectionName, document);
+    Meteor._ensure(self._documents, collectionName)[id] = true;
+    self._session.added(self._subscriptionId, collectionName, id, fields);
   },
 
   changed: function (collectionName, id, fields) {
