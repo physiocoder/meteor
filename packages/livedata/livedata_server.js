@@ -193,7 +193,7 @@ _.extend(Meteor._SessionCollectionView.prototype, {
     var clearedResult = [];
     var docView = self.documents[id];
     if (!docView)
-      throw new Error("Could not find element with id " + id + "to change");
+      throw new Error("Could not find element with id " + id + " to change");
     _.each(changed, function (value, key) {
       docView.changeField(subscriptionId, key, value, changedResult);
     });
@@ -669,15 +669,21 @@ _.extend(Meteor._LivedataSession.prototype, {
   // all subscriptions
   _setUserId: function(userId) {
     var self = this;
-    self.userId = userId;
     self._isSending = false;
-    var beforeCVs = self.collectionViews;
-    self.collectionViews = {};
+
     self._eachSub(function (sub) {
       sub._resetSubscription();
+    });
+
+    var beforeCVs = self.collectionViews;
+    self.collectionViews = {};
+    self.userId = userId;
+
+    self._eachSub(function (sub) {
       sub.userId = self.userId;
       sub._runHandler();
     });
+
     self._isSending = true;
 
     self._diffCollectionViews(beforeCVs);
