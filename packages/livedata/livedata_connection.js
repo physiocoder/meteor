@@ -904,6 +904,7 @@ _.extend(Meteor._LivedataConnection.prototype, {
   },
 
   _pushUpdate: function (updates, collection, msg) {
+    var self = this;
     if (!_.has(updates, collection)) {
       updates[collection] = [];
     }
@@ -1019,6 +1020,7 @@ _.extend(Meteor._LivedataConnection.prototype, {
   },
 
   _process_complete: function (msg, updates) {
+    var self = this;
     // Process "sub ready" messages. "sub ready" messages don't take effect
     // until all current server documents have been flushed to the local
     // database. We can use a write fence to implement this.
