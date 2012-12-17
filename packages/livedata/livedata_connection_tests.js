@@ -5,6 +5,18 @@ var newConnection = function (stream) {
   return new Meteor._LivedataConnection(stream, {reloadWithOutstanding: true});
 };
 
+var makeConnectMessage = function (session) {
+  var msg = {
+    msg: 'connect',
+    version: Meteor._SUPPORTED_DDP_VERSIONS[0],
+    support: Meteor._SUPPORTED_DDP_VERSIONS
+  };
+
+  if (session)
+    msg.session = session;
+  return msg;
+}
+
 var testGotMessage = function (test, stream, expected) {
   var retVal = undefined;
 
@@ -46,7 +58,7 @@ var testGotMessage = function (test, stream, expected) {
 var startAndConnect = function(test, stream) {
   stream.reset(); // initial connection start.
 
-  testGotMessage(test, stream, {msg: 'connect'});
+  testGotMessage(test, stream, makeConnectMessage());
   test.length(stream.sent, 0);
 
   stream.receive({msg: 'connected', session: SESSION_ID});
@@ -134,7 +146,6 @@ Tinytest.addAsync("livedata stub - subscribe", function (test, onComplete) {
     onComplete();
   }, 10);
 });
-
 
 Tinytest.add("livedata stub - this", function (test) {
   var stream = new Meteor._StubStream();
@@ -367,7 +378,7 @@ Tinytest.add("livedata stub - method call before connect", function (test) {
   // Now connect.
   stream.reset();
 
-  testGotMessage(test, stream, {msg: 'connect'});
+  testGotMessage(test, stream, makeConnectMessage());
   testGotMessage(test, stream, {msg: 'method', method: 'someMethod',
                                 params: [], id: '*'});
 });
@@ -439,7 +450,7 @@ Tinytest.add("livedata stub - reconnect", function (test) {
   // sub. The wait method still is blocked.
   stream.reset();
 
-  testGotMessage(test, stream, {msg: 'connect', session: SESSION_ID});
+  testGotMessage(test, stream, makeConnectMessage(SESSION_ID));
   testGotMessage(test, stream, methodMessage);
   testGotMessage(test, stream, subMessage);
 
@@ -559,7 +570,7 @@ Tinytest.add("livedata stub - reconnect method which only got result", function 
   // in. Reconnect quiescence happens as soon as 'connected' is received because
   // there are no pending methods or subs in need of revival.
   stream.reset();
-  testGotMessage(test, stream, {msg: 'connect', session: SESSION_ID});
+  testGotMessage(test, stream, makeConnectMessage(SESSION_ID));
   // Still holding out hope for session resumption, so nothing updated yet.
   test.equal(coll.find().count(), 1);
   test.equal(coll.findOne(stubWrittenId), {_id: stubWrittenId, foo: 'bar'});
@@ -631,7 +642,7 @@ Tinytest.add("livedata stub - reconnect method which only got result", function 
   // but slowMethod gets called via onReconnect. Reconnect quiescence is now
   // blocking on slowMethod.
   stream.reset();
-  testGotMessage(test, stream, {msg: 'connect', session: SESSION_ID + 1});
+  testGotMessage(test, stream, makeConnectMessage(SESSION_ID + 1));
   var slowMethodId = testGotMessage(
     test, stream,
     {msg: 'method', method: 'slowMethod', params: [], id: '*'});
@@ -721,7 +732,7 @@ Tinytest.add("livedata stub - reconnect method which only got data", function (t
   // Reset stream. Method gets resent (with same ID), and blocks reconnect
   // quiescence.
   stream.reset();
-  testGotMessage(test, stream, {msg: 'connect', session: SESSION_ID});
+  testGotMessage(test, stream, makeConnectMessage(SESSION_ID));
   testGotMessage(
     test, stream, {msg: 'method', method: 'doLittle',
                    params: [], id: methodId});
@@ -983,8 +994,7 @@ Tinytest.add("livedata connection - onReconnect prepends messages correctly with
   // reconnect
   stream.sent = [];
   stream.reset();
-  testGotMessage(
-    test, stream, {msg: 'connect', session: conn._lastSessionId});
+  testGotMessage(test, stream, makeConnectMessage(conn._lastSessionId));
 
   // Test that we sent what we expect to send, and we're blocked on
   // what we expect to be blocked. The subsequent logic to correctly
@@ -1005,6 +1015,33 @@ Tinytest.add("livedata connection - onReconnect prepends messages correctly with
     [true, ['two']],
     [false, ['three']]
   ]);
+});
+
+Tinytest.addAsync("livedata connection - version negotiation requires renegotiating",
+                  function (test, onComplete) {
+  var connection = new Meteor._LivedataConnection("/", {
+    reloadWithOutstanding: true,
+    supportedDDPVersions: ["garbled", Meteor._SUPPORTED_DDP_VERSIONS[0]],
+    onConnectionFailure: function () { test.fail(); onComplete(); },
+    onConnected: function () {
+      test.equal(connection._version, Meteor._SUPPORTED_DDP_VERSIONS[0]);
+      connection._stream.forceDisconnect(true);
+      onComplete();
+    }
+  });
+});
+
+Tinytest.addAsync("livedata connection - version negotiation fails",
+                  function (test, onComplete) {
+  var connection = new Meteor._LivedataConnection("/", {
+    reloadWithOutstanding: true,
+    supportedDDPVersions: ["garbled", "more garbled"],
+    onConnectionFailure: function () { onComplete(); },
+    onConnected: function () {
+      test.fail();
+      onComplete();
+    }
+  });
 });
 
 Tinytest.add("livedata connection - onReconnect prepends messages correctly without a wait method", function(test) {
@@ -1029,8 +1066,7 @@ Tinytest.add("livedata connection - onReconnect prepends messages correctly with
   // reconnect
   stream.sent = [];
   stream.reset();
-  testGotMessage(
-    test, stream, {msg: 'connect', session: conn._lastSessionId});
+  testGotMessage(test, stream, makeConnectMessage(conn._lastSessionId));
 
   // Test that we sent what we expect to send, and we're blocked on
   // what we expect to be blocked. The subsequent logic to correctly
@@ -1126,7 +1162,7 @@ Tinytest.add("livedata stub - reconnect double wait method", function (test) {
   // Reset stream. halfwayMethod does NOT get resent, but reconnectMethod does!
   // Reconnect quiescence happens when reconnectMethod is done.
   stream.reset();
-  testGotMessage(test, stream, {msg: 'connect', session: SESSION_ID});
+  testGotMessage(test, stream, makeConnectMessage(SESSION_ID));
   var reconnectId = testGotMessage(
     test, stream, {msg: 'method', method: 'reconnectMethod',
                    params: [], id: '*'});
