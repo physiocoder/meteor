@@ -234,7 +234,12 @@ Meteor._LivedataConnection = function (url, options) {
     // add new subscriptions at the end. this way they take effect after
     // the handlers and we don't see flicker.
     self._subCollection.find().forEach(function (sub) {
-      self._send({msg: 'sub', id: sub._id, name: sub.name, params: sub.args});
+      self._send({
+        msg: 'sub',
+        id: sub._id,
+        name: sub.name,
+        params: sub.args
+      });
     });
   });
 
@@ -252,7 +257,12 @@ Meteor._LivedataConnection = function (url, options) {
   // that holds a reference to self._subCollection
   self._subCollection.find({})._observeUnordered({
     added: function (sub) {
-      self._send({msg: 'sub', id: sub._id, name: sub.name, params: sub.args});
+      self._send({
+        msg: 'sub',
+        id: sub._id,
+        name: sub.name,
+        params: sub.args
+      });
     },
     changed: function (sub) {
       if (sub.count <= 0) {
