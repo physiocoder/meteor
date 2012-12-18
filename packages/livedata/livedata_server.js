@@ -864,18 +864,6 @@ _.extend(Meteor._LivedataSubscription.prototype, {
 /* LivedataServer                                                             */
 /******************************************************************************/
 
-var _calculateVersion = function (clientSupportedVersions, serverSupportedVersions) {
-  var correctVersion = _.find(clientSupportedVersions, function (version) {
-    return _.contains(serverSupportedVersions, version);
-  });
-  if (!correctVersion) {
-    correctVersion = serverSupportedVersions[0];
-  }
-  return correctVersion;
-};
-
-Meteor._calculateVersion = _calculateVersion;
-
 
 Meteor._LivedataServer = function () {
   var self = this;
@@ -971,7 +959,8 @@ _.extend(Meteor._LivedataServer.prototype, {
     var self = this;
     // In the future, handle session resumption: something like:
     //  socket.meteor_session = self.sessions[msg.session]
-    var version = _calculateVersion(msg.support, Meteor._SUPPORTED_DDP_VERSIONS);
+    var version = Meteor._LivedataServer._calculateVersion(
+      msg.support, Meteor._SUPPORTED_DDP_VERSIONS);
 
     if (msg.version === version) {
       // Creating a new session
@@ -985,8 +974,7 @@ _.extend(Meteor._LivedataServer.prototype, {
       socket.meteor_session.connect(socket);
     } else {
       socket.send(JSON.stringify({msg: 'failed', version: version}));
-      socket.removeAllListeners('data');
-      //XXX: is abandoning a socket a memory leak?
+      socket.close();
     }
   },
   /**
@@ -1160,4 +1148,16 @@ _.extend(Meteor._LivedataServer.prototype, {
       f();
   }
 });
+
+Meteor._LivedataServer._calculateVersion = function (clientSupportedVersions,
+                                                     serverSupportedVersions) {
+  var correctVersion = _.find(clientSupportedVersions, function (version) {
+    return _.contains(serverSupportedVersions, version);
+  });
+  if (!correctVersion) {
+    correctVersion = serverSupportedVersions[0];
+  }
+  return correctVersion;
+};
+
 })();
