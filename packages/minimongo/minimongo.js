@@ -212,7 +212,7 @@ _.extend(LocalCollection.Cursor.prototype, {
       ordered: ordered,
       cursor: this
     };
-    query.results = self._getRawObjects(ordered);
+    query.results = LocalCollection._deepcopy(self._getRawObjects(ordered));
     if (self.collection.paused)
       query.results_snapshot = (ordered ? [] : {});
 
@@ -471,16 +471,6 @@ LocalCollection.prototype.update = function (selector, mod, options) {
 
   var selector_f = LocalCollection._compileSelector(selector);
 
-  // Save the original results of any query that we might need to
-  // _recomputeResults on, because _modifyAndNotify will mutate the objects in
-  // it. (We don't need to save the original results of paused queries because
-  // they already have a results_snapshot and we won't be diffing in
-  // _recomputeResults.)
-  var qidToOriginalResults = {};
-  _.each(self.queries, function (query, qid) {
-    if ((query.cursor.skip || query.cursor.limit) && !query.paused)
-      qidToOriginalResults[qid] = LocalCollection._deepcopy(query.results);
-  });
   var recomputeQids = {};
 
   for (var id in self.docs) {
@@ -495,8 +485,7 @@ LocalCollection.prototype.update = function (selector, mod, options) {
   }
 
   _.each(recomputeQids, function (dummy, qid) {
-    LocalCollection._recomputeResults(self.queries[qid],
-                                      qidToOriginalResults[qid]);
+    LocalCollection._recomputeResults(self.queries[qid]);
   });
 };
 
@@ -576,15 +565,15 @@ LocalCollection._insertInResults = function (query, doc) {
   if (query.ordered) {
     if (!query.sort_f) {
       query.added(LocalCollection._deepcopy(doc), query.results.length);
-      query.results.push(doc);
+      query.results.push(LocalCollection._deepcopy(doc));
     } else {
       var i = LocalCollection._insertInSortedList(
-        query.sort_f, query.results, doc);
+        query.sort_f, query.results, LocalCollection._deepcopy(doc));
       query.added(LocalCollection._deepcopy(doc), i);
     }
   } else {
     query.added(LocalCollection._deepcopy(doc));
-    query.results[doc._id] = doc;
+    query.results[doc._id] = LocalCollection._deepcopy(doc);
   }
 };
 
@@ -606,21 +595,23 @@ LocalCollection._updateInResults = function (query, doc, old_doc) {
 
   if (!query.ordered) {
     query.changed(LocalCollection._deepcopy(doc), old_doc);
-    query.results[doc._id] = doc;
+    query.results[doc._id] = LocalCollection._deepcopy(doc);
     return;
   }
 
   var orig_idx = LocalCollection._findInOrderedResults(query, doc);
   query.changed(LocalCollection._deepcopy(doc), orig_idx, old_doc);
 
-  if (!query.sort_f)
+  if (!query.sort_f) {
+    query.results[orig_idx] = LocalCollection._deepcopy(doc);
     return;
+  }
 
   // just take it out and put it back in again, and see if the index
   // changes
   query.results.splice(orig_idx, 1);
   var new_idx = LocalCollection._insertInSortedList(
-    query.sort_f, query.results, doc);
+    query.sort_f, query.results, LocalCollection._deepcopy(doc));
   if (orig_idx !== new_idx)
     query.moved(LocalCollection._deepcopy(doc), orig_idx, new_idx);
 };
@@ -633,10 +624,10 @@ LocalCollection._updateInResults = function (query, doc, old_doc) {
 // old results (and there's no need to pass in oldResults), because these
 // operations don't mutate the documents in the collection. Update needs to pass
 // in an oldResults which was deep-copied before the modifier was applied.
-LocalCollection._recomputeResults = function (query, oldResults) {
-  if (!oldResults)
-    oldResults = query.results;
-  query.results = query.cursor._getRawObjects(query.ordered);
+LocalCollection._recomputeResults = function (query) {
+  var oldResults = query.results;
+  query.results = LocalCollection._deepcopy(
+    query.cursor._getRawObjects(query.ordered));
 
   if (!query.paused)
     LocalCollection._diffQuery(
@@ -648,7 +639,7 @@ LocalCollection._findInOrderedResults = function (query, doc) {
   if (!query.ordered)
     throw new Error("Can't call _findInOrderedResults on unordered query");
   for (var i = 0; i < query.results.length; i++)
-    if (query.results[i] === doc)
+    if (query.results[i]._id === doc._id)
       return i;
   throw Error("object missing from query");
 };
