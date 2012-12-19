@@ -16,7 +16,8 @@ Package.on_use(function (api, where) {
     'sort.js',
     'uuid.js',
     'modify.js',
-    'diff.js'
+    'diff.js',
+    'message_bus.js'
   ], where);
 });
 
@@ -24,4 +25,5 @@ Package.on_test(function (api) {
   api.use('minimongo', 'client');
   api.use('tinytest');
   api.add_files('minimongo_tests.js', 'client');
+  api.add_files('message_bus_tests.js', 'client');
 });
