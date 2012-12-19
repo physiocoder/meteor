@@ -339,16 +339,40 @@ LocalCollection.Cursor.prototype._markAsReactive = function (options) {
 // this in our handling of null and $exists)
 LocalCollection.prototype.insert = function (doc) {
   var self = this;
-  doc = LocalCollection._deepcopy(doc);
-  // XXX deal with mongo's binary id type?
-  if (!('_id' in doc))
-    doc._id = LocalCollection.uuid();
 
-  if (_.has(self.docs, doc._id))
-    throw new Error("Duplicate _id '" + doc._id + "'");
+  var message = {msg: 'added', fields: LocalCollection._deepcopy(doc)};
+  if (_.has(message.fields, '_id')) {
+    message.id = message.fields._id;
+    delete message.fields._id;
+  } else {
+    message.id = LocalCollection.uuid();
+  }
 
-  self._saveOriginal(doc._id, undefined);
-  self.docs[doc._id] = doc;
+  if (_.has(self.docs, message.id))
+    throw new Error("Duplicate _id '" + message.id + "'");
+
+  self._applyMessages([message]);
+};
+
+LocalCollection.prototype._applyMessages = function (messages) {
+  var self = this;
+  _.each(messages, function (message) {
+    if (message.msg === 'added') {
+      self._applyAdded(message);
+    } else {
+      throw new Error("Unknown message type: " + message.msg);
+    }
+  });
+};
+
+LocalCollection.prototype._applyAdded = function (message) {
+  var self = this;
+
+  if (_.has(self.docs, message.id))
+    throw new Error("Unexpected added for ID " + message.id);
+
+  self._saveOriginal(message.id, undefined);
+  var doc = self.docs[message.id] = _.extend({_id: message.id}, message.fields);
 
   var queriesToRecompute = [];
 
