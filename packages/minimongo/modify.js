@@ -3,68 +3,6 @@
 // function, from the compiled selector
 //
 // maybe just {key.up.to.just.before.dollarsign: array_index}
-//
-// XXX atomicity: if one modification fails, do we roll back the whole
-// change?
-LocalCollection._modify = function (doc, mod) {
-  var is_modifier = false;
-  for (var k in mod) {
-    // IE7 doesn't support indexing into strings (eg, k[0]), so use substr.
-    // Too bad -- it's far slower:
-    // http://jsperf.com/testing-the-first-character-of-a-string
-    is_modifier = k.substr(0, 1) === '$';
-    break; // just check the first key.
-  }
-
-  var new_doc;
-
-  if (!is_modifier) {
-    if (mod._id && doc._id !== mod._id)
-      throw Error("Cannot change the _id of a document");
-
-    // replace the whole document
-    for (var k in mod) {
-      if (k.substr(0, 1) === '$')
-        throw Error("When replacing document, field name may not start with '$'");
-      if (/\./.test(k))
-        throw Error("When replacing document, field name may not contain '.'");
-    }
-    new_doc = mod;
-  } else {
-    // apply modifiers
-    var new_doc = LocalCollection._deepcopy(doc);
-
-    for (var op in mod) {
-      var mod_func = LocalCollection._modifiers[op];
-      if (!mod_func)
-        throw Error("Invalid modifier specified " + op);
-      for (var keypath in mod[op]) {
-        // XXX mongo doesn't allow mod field names to end in a period,
-        // but I don't see why.. it allows '' as a key, as does JS
-        if (keypath.length && keypath[keypath.length-1] === '.')
-          throw Error("Invalid mod field name, may not end in a period");
-
-        var arg = mod[op][keypath];
-        var keyparts = keypath.split('.');
-        var no_create = !!LocalCollection._noCreateModifiers[op];
-        var forbid_array = (op === "$rename");
-        var target = LocalCollection._findModTarget(new_doc, keyparts,
-                                                    no_create, forbid_array);
-        var field = keyparts.pop();
-        mod_func(target, field, arg, keypath, new_doc);
-      }
-    }
-  }
-
-  // move new document into place
-  for (var k in doc) {
-    if (k !== '_id')
-      delete doc[k];
-  }
-  for (var k in new_doc) {
-    doc[k] = new_doc[k];
-  }
-};
 
 // for a.b.c.2.d.e, keyparts should be ['a', 'b', 'c', '2', 'd', 'e'],
 // and then you would operate on the 'e' property of the returned
@@ -301,8 +239,6 @@ LocalCollection._modifiers = {
 //
 // maybe just {key.up.to.just.before.dollarsign: array_index}
 LocalCollection._computeChange = function (doc, mod) {
-  var changeFields = {};
-
   var isModifier = false;
   for (var k in mod) {
     // IE7 doesn't support indexing into strings (eg, k[0]), so use substr.
@@ -319,7 +255,7 @@ LocalCollection._computeChange = function (doc, mod) {
     if (mod._id && doc._id !== mod._id)
       throw Error("Cannot change the _id of a document");
 
-    newDoc = {_id: doc._id};
+    newDoc = {};
 
     // replace the whole document
     _.each(mod, function (v, k) {
@@ -327,8 +263,7 @@ LocalCollection._computeChange = function (doc, mod) {
         throw Error("When replacing document, field name may not start with '$'");
       if (k.indexOf('.') !== -1)
         throw Error("When replacing document, field name may not contain '.'");
-      if (k !== '_id')
-        newDoc[k] = LocalCollection._deepcopy(v);
+      newDoc[k] = LocalCollection._deepcopy(v);
     });
   } else {
     newDoc = LocalCollection._deepcopy(doc);
@@ -355,24 +290,33 @@ LocalCollection._computeChange = function (doc, mod) {
     });
   }
 
+  var message = {msg: 'changed', id: doc._id};
+  var changeFields = {};
+  var clearFields = [];
+
   diffObjects(doc, newDoc, {
     leftOnly: function (key, leftValue) {
-      changeFields[key] = undefined;
+      if (key !== '_id')
+        clearFields.push(key);
     },
     rightOnly: function (key, rightValue) {
-      changeFields[key] = rightValue;
+      if (key !== '_id')
+        changeFields[key] = rightValue;
     },
     both: function (key, leftValue, rightValue) {
-      if (!LocalCollection._f._equal(leftValue, rightValue))
+      if (key !== '_id' && !LocalCollection._f._equal(leftValue, rightValue))
         changeFields[key] = rightValue;
     }
   });
-
+  if (!_.isEmpty(changeFields))
+    message.fields = changeFields;
+  if (!_.isEmpty(clearFields))
+    message.cleared = clearFields;
   // No-op change.
-  if (_.isEmpty(changeFields))
+  if (!(message.fields || message.cleared))
     return null;
 
-  return changeFields;
+  return message;
 };
 
 // XXX copy/paste from livedata_server.js; should go in a util place.

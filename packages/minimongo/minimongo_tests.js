@@ -626,7 +626,7 @@ Tinytest.add("minimongo - selector_compiler", function (test) {
   match({$or: [{a: {$not: {$mod: [10, 1]}}}, {a: {$mod: [10, 2]}}]}, {a: 2});
   match({$or: [{a: {$not: {$mod: [10, 1]}}}, {a: {$mod: [10, 2]}}]}, {a: 3});
   // this is possibly an open-ended task, so we stop here ...
-  
+
   // $nor
   test.throws(function () {
     match({$nor: []}, {});
@@ -761,17 +761,17 @@ Tinytest.add("minimongo - selector_compiler", function (test) {
   nomatch({$and: [{a: {$nin: [1, 2, 3]}}, {b: {$nin: [4, 5, 6]}}]}, {a: 1, b: 4});
 
   // $and and $lt, $lte, $gt, $gte
-  match({$and: [{a: {$lt: 2}}]}, {a: 1}); 
-  nomatch({$and: [{a: {$lt: 1}}]}, {a: 1}); 
-  match({$and: [{a: {$lte: 1}}]}, {a: 1}); 
-  match({$and: [{a: {$gt: 0}}]}, {a: 1}); 
-  nomatch({$and: [{a: {$gt: 1}}]}, {a: 1}); 
-  match({$and: [{a: {$gte: 1}}]}, {a: 1}); 
-  match({$and: [{a: {$gt: 0}}, {a: {$lt: 2}}]}, {a: 1}); 
-  nomatch({$and: [{a: {$gt: 1}}, {a: {$lt: 2}}]}, {a: 1}); 
-  nomatch({$and: [{a: {$gt: 0}}, {a: {$lt: 1}}]}, {a: 1}); 
-  match({$and: [{a: {$gte: 1}}, {a: {$lte: 1}}]}, {a: 1}); 
-  nomatch({$and: [{a: {$gte: 2}}, {a: {$lte: 0}}]}, {a: 1}); 
+  match({$and: [{a: {$lt: 2}}]}, {a: 1});
+  nomatch({$and: [{a: {$lt: 1}}]}, {a: 1});
+  match({$and: [{a: {$lte: 1}}]}, {a: 1});
+  match({$and: [{a: {$gt: 0}}]}, {a: 1});
+  nomatch({$and: [{a: {$gt: 1}}]}, {a: 1});
+  match({$and: [{a: {$gte: 1}}]}, {a: 1});
+  match({$and: [{a: {$gt: 0}}, {a: {$lt: 2}}]}, {a: 1});
+  nomatch({$and: [{a: {$gt: 1}}, {a: {$lt: 2}}]}, {a: 1});
+  nomatch({$and: [{a: {$gt: 0}}, {a: {$lt: 1}}]}, {a: 1});
+  match({$and: [{a: {$gte: 1}}, {a: {$lte: 1}}]}, {a: 1});
+  nomatch({$and: [{a: {$gte: 2}}, {a: {$lte: 0}}]}, {a: 1});
 
   // $and and $ne
   match({$and: [{a: {$ne: 1}}]}, {});
@@ -915,29 +915,14 @@ Tinytest.add("minimongo - subkey sort", function (test) {
 
 Tinytest.add("minimongo - modify", function (test) {
   var modify = function (doc, mod, result) {
-    var copy = LocalCollection._deepcopy(doc);
-    LocalCollection._modify(copy, mod);
-    if (!LocalCollection._f._equal(copy, result)) {
-      // XXX super janky
-      test.fail({type: "minimongo-modifier",
-                 message: "modifier test failure",
-                 input_doc: JSON.stringify(doc),
-                 modifier: JSON.stringify(mod),
-                 expected: JSON.stringify(result),
-                 actual: JSON.stringify(copy)
-                });
-    } else {
-      test.ok();
-    }
-
-    var changeFields = LocalCollection._computeChange(doc, mod);
+    var message = LocalCollection._computeChange(doc, mod);
     var actual = LocalCollection._deepcopy(doc);
-    if (changeFields) {
-      _.each(changeFields, function (value, key) {
-        if (value === undefined)
-          delete actual[key];
-        else
-          actual[key] = value;
+    if (message) {
+      _.each(message.fields, function (value, key) {
+        actual[key] = value;
+      });
+      _.each(message.cleared, function (clearKey) {
+        delete actual[clearKey];
       });
     }
 

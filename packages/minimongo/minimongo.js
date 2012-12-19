@@ -385,11 +385,41 @@ LocalCollection.prototype.remove = function (selector) {
   self._applyMessages(messages);
 };
 
+// XXX atomicity: if multi is true, and one modification fails, do
+// we rollback the whole operation, or what?
+LocalCollection.prototype.update = function (selector, mod, options) {
+  var self = this;
+  if (!options) options = {};
+
+  if (options.upsert)
+    throw new Error("upsert not yet implemented");
+
+  var selector_f = LocalCollection._compileSelector(selector);
+
+  var recomputeQids = {};
+  var messages = [];
+  for (var id in self.docs) {
+    var doc = self.docs[id];
+    if (selector_f(doc)) {
+      var message = LocalCollection._computeChange(doc, mod);
+      if (message) {
+        messages.push(message);
+      }
+
+      if (!options.multi)
+        break;
+    }
+  }
+  self._applyMessages(messages);
+};
+
 LocalCollection.prototype._applyMessages = function (messages) {
   var self = this;
   if (_.isEmpty(messages))
     return;
   _.each(messages, function (message) {
+    if (self._name)
+      message.collection = self._name;
     self._bus.fire(message);
   });
   self._bus.fire({msg: 'done'});
@@ -401,6 +431,8 @@ LocalCollection.prototype._applyMessage = function (message) {
     self._applyAdded(message);
   } else if (message.msg === 'removed') {
     self._applyRemoved(message);
+  } else if (message.msg === 'changed') {
+    self._applyChanged(message);
   }
 };
 
@@ -460,59 +492,30 @@ LocalCollection.prototype._applyRemoved = function (message) {
   });
 };
 
-// XXX atomicity: if multi is true, and one modification fails, do
-// we rollback the whole operation, or what?
-LocalCollection.prototype.update = function (selector, mod, options) {
+
+LocalCollection.prototype._applyChanged = function (message) {
   var self = this;
-  if (!options) options = {};
+  if (!_.has(self.docs, message.id))
+    throw new Error("Unexpected changed for ID " + message.id);
+  var doc = self.docs[message.id];
 
-  if (options.upsert)
-    throw new Error("upsert not yet implemented");
+  self._saveOriginal(message.id, doc);
+  var oldDoc = LocalCollection._deepcopy(doc);
 
-  var selector_f = LocalCollection._compileSelector(selector);
-
-  var recomputeQids = {};
-
-  for (var id in self.docs) {
-    var doc = self.docs[id];
-    if (selector_f(doc)) {
-      // XXX Should we save the original even if mod ends up being a no-op?
-      self._saveOriginal(id, doc);
-      self._modifyAndNotify(doc, mod, recomputeQids);
-      if (!options.multi)
-        break;
-    }
-  }
-
-  _.each(recomputeQids, function (dummy, qid) {
-    LocalCollection._recomputeResults(self.queries[qid]);
+  // the actual mutation
+  _.each(message.fields, function (value, key) {
+    doc[key] = value;
   });
-};
+  _.each(message.cleared, function (clearKey) {
+    delete doc[clearKey];
+  });
 
-LocalCollection.prototype._modifyAndNotify = function (
-    doc, mod, recomputeQids) {
-  var self = this;
+  // trigger live queries that match
+  var queriesToRecompute = [];
 
-  var matched_before = {};
-  for (var qid in self.queries) {
-    var query = self.queries[qid];
-    if (query.ordered) {
-      matched_before[qid] = query.selector_f(doc);
-    } else {
-      // Because we don't support skip or limit (yet) in unordered queries, we
-      // can just do a direct lookup.
-      matched_before[qid] = _.has(query.results, doc._id);
-    }
-  }
-
-  var old_doc = LocalCollection._deepcopy(doc);
-
-  LocalCollection._modify(doc, mod);
-
-  for (qid in self.queries) {
-    query = self.queries[qid];
-    var before = matched_before[qid];
+  _.each(self.queries, function (query) {
     var after = query.selector_f(doc);
+    var before = query.selector_f(oldDoc);
 
     if (query.cursor.skip || query.cursor.limit) {
       // We need to recompute any query where the doc may have been in the
@@ -523,15 +526,18 @@ LocalCollection.prototype._modifyAndNotify = function (
       // in the output. So it's safe to skip recompute if neither before or
       // after are true.)
       if (before || after)
-	recomputeQids[qid] = true;
+	queriesToRecompute.push(query);
     } else if (before && !after) {
       LocalCollection._removeFromResults(query, doc);
     } else if (!before && after) {
       LocalCollection._insertInResults(query, doc);
     } else if (before && after) {
-      LocalCollection._updateInResults(query, doc, old_doc);
+      LocalCollection._updateInResults(query, doc, oldDoc);
     }
-  }
+  });
+  _.each(queriesToRecompute, function (query) {
+    LocalCollection._recomputeResults(query);
+  });
 };
 
 // XXX findandmodify
@@ -737,4 +743,3 @@ LocalCollection.prototype.resumeObservers = function () {
     query.results_snapshot = null;
   }
 };
-
