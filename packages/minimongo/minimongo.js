@@ -354,49 +354,9 @@ LocalCollection.prototype.insert = function (doc) {
   self._applyMessages([message]);
 };
 
-LocalCollection.prototype._applyMessages = function (messages) {
-  var self = this;
-  _.each(messages, function (message) {
-    if (message.msg === 'added') {
-      self._applyAdded(message);
-    } else {
-      throw new Error("Unknown message type: " + message.msg);
-    }
-  });
-};
-
-LocalCollection.prototype._applyAdded = function (message) {
-  var self = this;
-
-  if (_.has(self.docs, message.id))
-    throw new Error("Unexpected added for ID " + message.id);
-
-  self._saveOriginal(message.id, undefined);
-  var doc = self.docs[message.id] = _.extend({_id: message.id}, message.fields);
-
-  var queriesToRecompute = [];
-
-  // trigger live queries that match
-  for (var qid in self.queries) {
-    var query = self.queries[qid];
-    if (query.selector_f(doc)) {
-      if (query.cursor.skip || query.cursor.limit)
-        queriesToRecompute.push(query);
-      else
-        LocalCollection._insertInResults(query, doc);
-    }
-  }
-
-  _.each(queriesToRecompute, function (query) {
-    LocalCollection._recomputeResults(query);
-  });
-};
-
 LocalCollection.prototype.remove = function (selector) {
   var self = this;
   var remove = [];
-
-  var queriesToRecompute = [];
 
   // Avoid O(n) for "remove a single doc by ID".
   if (LocalCollection._selectorIsId(selector)) {
@@ -412,26 +372,77 @@ LocalCollection.prototype.remove = function (selector) {
     }
   }
 
-  var queryRemove = [];
-  for (var i = 0; i < remove.length; i++) {
-    var removeId = remove[i];
-    var removeDoc = self.docs[removeId];
-    _.each(self.queries, function (query) {
-      if (query.selector_f(removeDoc)) {
-        if (query.cursor.skip || query.cursor.limit)
-          queriesToRecompute.push(query);
-        else
-          queryRemove.push([query, removeDoc]);
-      }
-    });
-    self._saveOriginal(removeId, removeDoc);
-    delete self.docs[removeId];
+  var messages = _.map(remove, function (id) {
+    return {msg: 'removed', id: id};
+  });
+
+  self._applyMessages(messages);
+};
+
+LocalCollection.prototype._applyMessages = function (messages) {
+  var self = this;
+  _.each(messages, function (message) {
+    if (message.msg === 'added') {
+      self._applyAdded(message);
+    } else if (message.msg === 'removed') {
+      self._applyRemoved(message);
+    } else {
+      throw new Error("Unknown message type: " + message.msg);
+    }
+  });
+};
+
+LocalCollection.prototype._applyAdded = function (message) {
+  var self = this;
+
+  if (_.has(self.docs, message.id))
+    throw new Error("Unexpected added for ID " + message.id);
+
+  self._saveOriginal(message.id, undefined);
+  var doc = self.docs[message.id] = _.extend({_id: message.id}, message.fields);
+
+
+
+  // trigger live queries that match
+  var queriesToRecompute = [];
+  for (var qid in self.queries) {
+    var query = self.queries[qid];
+    if (query.selector_f(doc)) {
+      if (query.cursor.skip || query.cursor.limit)
+        queriesToRecompute.push(query);
+      else
+        LocalCollection._insertInResults(query, doc);
+    }
   }
 
-  // run live query callbacks _after_ we've removed the documents.
-  for (var i = 0; i < queryRemove.length; i++) {
-    LocalCollection._removeFromResults(queryRemove[i][0], queryRemove[i][1]);
-  }
+  _.each(queriesToRecompute, function (query) {
+    LocalCollection._recomputeResults(query);
+  });
+};
+
+LocalCollection.prototype._applyRemoved = function (message) {
+  var self = this;
+
+  if (!_.has(self.docs, message.id))
+    throw new Error("Unexpected removed for ID " + message.id);
+
+  var removeDoc = self.docs[message.id];
+  self._saveOriginal(message.id, removeDoc);
+  delete self.docs[message.id];
+
+
+  // trigger live queries that match
+  var queriesToRecompute = [];
+
+  _.each(self.queries, function (query) {
+    if (query.selector_f(removeDoc)) {
+      if (query.cursor.skip || query.cursor.limit)
+        queriesToRecompute.push(query);
+      else
+        LocalCollection._removeFromResults(query, removeDoc);
+    }
+  });
+
   _.each(queriesToRecompute, function (query) {
     LocalCollection._recomputeResults(query);
   });
