@@ -5,12 +5,15 @@
 // Cursor: a specification for a particular subset of documents, w/
 // a defined order, limit, and offset.  creating a Cursor with LocalCollection.find(),
 
-// LiveResultsSet: the return value of a live query.
+LocalCollection = function (name, bus) {
+  var self = this;
 
-LocalCollection = function () {
-  this.docs = {}; // _id -> document (also containing id)
+  self._name = name;  // could be undefined
+  self._bus = bus || new LocalCollection._MessageBus;
 
-  this.next_qid = 1; // live query id generator
+  self.docs = {}; // _id -> document (also containing id)
+
+  self.next_qid = 1; // live query id generator
 
   // qid -> live query object. keys:
   //  ordered: bool. ordered queries have moved callbacks and callbacks
@@ -19,14 +22,17 @@ LocalCollection = function () {
   //  results_snapshot: snapshot of results. null if not paused.
   //  cursor: Cursor object for the query.
   //  selector_f, sort_f, (callbacks): functions
-  this.queries = {};
+  self.queries = {};
 
   // null if not saving originals; a map from id to original document value if
   // saving originals. See comments before saveOriginals().
-  this._savedOriginals = null;
+  self._savedOriginals = null;
 
   // True when observers are paused and we should not send callbacks.
-  this.paused = false;
+  self.paused = false;
+
+  self._bus.listen(name ? {collection: name} : {},
+                   _.bind(self._applyMessage, self));
 };
 
 // options may include sort, skip, limit, reactive
@@ -381,15 +387,21 @@ LocalCollection.prototype.remove = function (selector) {
 
 LocalCollection.prototype._applyMessages = function (messages) {
   var self = this;
+  if (_.isEmpty(messages))
+    return;
   _.each(messages, function (message) {
-    if (message.msg === 'added') {
-      self._applyAdded(message);
-    } else if (message.msg === 'removed') {
-      self._applyRemoved(message);
-    } else {
-      throw new Error("Unknown message type: " + message.msg);
-    }
+    self._bus.fire(message);
   });
+  self._bus.fire({msg: 'done'});
+};
+
+LocalCollection.prototype._applyMessage = function (message) {
+  var self = this;
+  if (message.msg === 'added') {
+    self._applyAdded(message);
+  } else if (message.msg === 'removed') {
+    self._applyRemoved(message);
+  }
 };
 
 LocalCollection.prototype._applyAdded = function (message) {

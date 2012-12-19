@@ -10,7 +10,7 @@ _.extend(Meteor._LocalCollectionDriver.prototype, {
     if (!name)
       return new LocalCollection;
     if (!(name in self.collections))
-      self.collections[name] = new LocalCollection;
+      self.collections[name] = new LocalCollection(name);
     return self.collections[name];
   }
 });
