@@ -33,6 +33,14 @@ LocalCollection = function (name, bus) {
 
   self._bus.listen(name ? {collection: name} : {},
                    _.bind(self._applyMessage, self));
+  self._bus.listen({msg: 'done'}, function () {
+    _.each(self.queries, function(query) {
+      if (query.needsRecompute) {
+        LocalCollection._recomputeResults(query);
+        query.needsRecompute = false;
+      }
+    });
+  });
 };
 
 // options may include sort, skip, limit, reactive
@@ -210,7 +218,8 @@ _.extend(LocalCollection.Cursor.prototype, {
       sort_f: ordered && self.sort_f,
       results_snapshot: null,
       ordered: ordered,
-      cursor: this
+      cursor: this,
+      needsRecompute: false
     };
     query.results = LocalCollection._deepcopy(self._getRawObjects(ordered));
     if (self.collection.paused)
@@ -396,7 +405,7 @@ LocalCollection.prototype.update = function (selector, mod, options) {
 
   var selector_f = LocalCollection._compileSelector(selector);
 
-  var recomputeQids = {};
+
   var messages = [];
   for (var id in self.docs) {
     var doc = self.docs[id];
@@ -448,20 +457,15 @@ LocalCollection.prototype._applyAdded = function (message) {
 
 
   // trigger live queries that match
-  var queriesToRecompute = [];
   for (var qid in self.queries) {
     var query = self.queries[qid];
     if (query.selector_f(doc)) {
       if (query.cursor.skip || query.cursor.limit)
-        queriesToRecompute.push(query);
+        query.needsRecompute = true;
       else
         LocalCollection._insertInResults(query, doc);
     }
   }
-
-  _.each(queriesToRecompute, function (query) {
-    LocalCollection._recomputeResults(query);
-  });
 };
 
 LocalCollection.prototype._applyRemoved = function (message) {
@@ -476,19 +480,13 @@ LocalCollection.prototype._applyRemoved = function (message) {
 
 
   // trigger live queries that match
-  var queriesToRecompute = [];
-
   _.each(self.queries, function (query) {
     if (query.selector_f(removeDoc)) {
       if (query.cursor.skip || query.cursor.limit)
-        queriesToRecompute.push(query);
+        query.needsRecompute = true;
       else
         LocalCollection._removeFromResults(query, removeDoc);
     }
-  });
-
-  _.each(queriesToRecompute, function (query) {
-    LocalCollection._recomputeResults(query);
   });
 };
 
@@ -511,8 +509,6 @@ LocalCollection.prototype._applyChanged = function (message) {
   });
 
   // trigger live queries that match
-  var queriesToRecompute = [];
-
   _.each(self.queries, function (query) {
     var after = query.selector_f(doc);
     var before = query.selector_f(oldDoc);
@@ -526,7 +522,7 @@ LocalCollection.prototype._applyChanged = function (message) {
       // in the output. So it's safe to skip recompute if neither before or
       // after are true.)
       if (before || after)
-	queriesToRecompute.push(query);
+	query.needsRecompute = true;
     } else if (before && !after) {
       LocalCollection._removeFromResults(query, doc);
     } else if (!before && after) {
@@ -534,9 +530,6 @@ LocalCollection.prototype._applyChanged = function (message) {
     } else if (before && after) {
       LocalCollection._updateInResults(query, doc, oldDoc);
     }
-  });
-  _.each(queriesToRecompute, function (query) {
-    LocalCollection._recomputeResults(query);
   });
 };
 
