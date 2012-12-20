@@ -136,6 +136,31 @@ Tinytest.add("minimongo - basics", function (test) {
   test.throws(function () { c.insert({_id: 1, name: "bla"}); });
   test.equal(c.find({_id: 1}).count(), 1);
   test.equal(c.findOne(1).name, "strawberry");
+
+  // Fields filtering.
+  test.equal(c.find({name: {$exists: true}},
+                    {fields: {name: 1}, sort: ['_id']}).fetch(),
+             [{_id: 1, name: "strawberry"},
+              {_id: 2, name: "apple"},
+              {_id: 3, name: "rose"}]);
+  test.equal(c.find({name: {$exists: true}},
+                    {fields: {tags: 0}, sort: ['_id']}).fetch(),
+             [{_id: 1, name: "strawberry"},
+              {_id: 2, name: "apple"},
+              {_id: 3, name: "rose"}]);
+  test.throws(function () {
+    c.find({}, {fields: {name: 1, tags: 0}});
+  });
+
+  // Dotted field filtering. For now, we treat "include foo.bar" as meaning
+  // "include foo", and we ignore "exclude foo.bar". This is basically a bug
+  // though, so if these tests fail because we've improved the behavior of
+  // dotted field filtering, that's OK!
+  c.insert({_id: 42, foo: {bar: 1, baz: 2}, quux: 3});
+  test.equal(c.findOne(42, {fields: {'foo.bar': true}}),
+             {_id: 42, foo: {bar: 1, baz: 2}});
+  test.equal(c.findOne(42, {fields: {'foo.bar': false}}),
+             {_id: 42, foo: {bar: 1, baz: 2}, quux: 3});
 });
 
 Tinytest.add("minimongo - cursors", function (test) {

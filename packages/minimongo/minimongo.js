@@ -57,11 +57,6 @@ LocalCollection = function (name, bus) {
 // reactive: if given, and false, don't register with Meteor.deps (default
 // is true)
 //
-// XXX possibly should support retrieving a subset of fields? and
-// have it be a hint (ignored on the client, when not copying the
-// doc?)
-//
-// XXX sort does not yet support subkeys ('a.b') .. fix that!
 // XXX add one more sort form: "key"
 // XXX tests
 LocalCollection.prototype.find = function (selector, options) {
@@ -76,29 +71,65 @@ LocalCollection.prototype.find = function (selector, options) {
 
 // don't call this ctor directly.  use LocalCollection.find().
 LocalCollection.Cursor = function (collection, selector, options) {
+  var self = this;
   if (!options) options = {};
 
-  this.collection = collection;
+  self.collection = collection;
 
   if ((typeof selector === "string") || (typeof selector === "number")) {
     // stash for fast path
-    this.selector_id = selector;
-    this.selector_f = LocalCollection._compileSelector(selector);
+    self.selector_id = selector;
+    self.selector_f = LocalCollection._compileSelector(selector);
   } else {
-    this.selector_f = LocalCollection._compileSelector(selector);
-    this.sort_f = options.sort ? LocalCollection._compileSort(options.sort) : null;
+    self.selector_f = LocalCollection._compileSelector(selector);
+    self.sort_f = options.sort ? LocalCollection._compileSort(options.sort) : null;
   }
-  this.skip = options.skip;
-  this.limit = options.limit;
+  self.skip = options.skip;
+  self.limit = options.limit;
+
+  self._fields = options.fields;
+  if (self._fields) {
+    var isInclusion = undefined;
+    var topLevelFields = {};
+    _.each(self._fields, function (include, key) {
+      if (isInclusion === undefined)
+        isInclusion = !!include;
+      else if (isInclusion !== !!include) {
+        throw new Error("Inconsistent field spec " +
+                        JSON.stringify(self._fields));
+      }
+      var dot = key.indexOf('.');
+      if (dot === -1) {
+        topLevelFields[key] = true;
+      } else {
+        // For now, we handle field specifiers that specify non-top-level fields
+        // in an imprecise way: we do all our filtering at the top level, so
+        // "include foo.bar" translates to "include foo", and "exclude foo.bar"
+        // is ignored.
+        // XXX Do more precise handling of multi-level field specifiers.
+        //     IF THIS CODE EVER GETS USED ON THE SERVER, THIS FIX *MUST*
+        //     BE APPLIED OR ELSE IT WILL BE A SECURITY HOLE!
+        if (isInclusion)
+          topLevelFields[key.substr(0, dot)] = true;
+      }
+    });
+    if (isInclusion === undefined)
+      throw new Error("Empty field spec");
+    self._includeField = function (key) {
+      return _.has(topLevelFields, key) ? isInclusion : !isInclusion;
+    };
+  } else {
+    self._includeField = function (key) { return true; };
+  }
 
   // db_objects is a list of the objects that match the cursor. (It's always a
   // list, never an object: LocalCollection.Cursor is always ordered.)
-  this.db_objects = null;
-  this.cursor_pos = 0;
+  self.db_objects = null;
+  self.cursor_pos = 0;
 
   // by default, queries register w/ Meteor.deps when it is available.
   if (typeof Meteor === "object" && Meteor.deps)
-    this.reactive = (options.reactive === undefined) ? true : options.reactive;
+    self.reactive = (options.reactive === undefined) ? true : options.reactive;
 };
 
 LocalCollection.Cursor.prototype.rewind = function () {
@@ -140,7 +171,18 @@ LocalCollection.Cursor.prototype.forEach = function (callback) {
                           moved: true});
 
   while (self.cursor_pos < self.db_objects.length)
-    callback(LocalCollection._deepcopy(self.db_objects[self.cursor_pos++]));
+    callback(self._copyFields(self.db_objects[self.cursor_pos++]));
+};
+
+// Returns a deep copy of 'doc', including only the fields the user requested.
+LocalCollection.Cursor.prototype._copyFields = function (doc) {
+  var self = this;
+  var output = {};
+  _.each(doc, function (value, key) {
+    if (key === '_id' || self._includeField(key))
+      output[key] = LocalCollection._deepcopy(value);
+  });
+  return output;
 };
 
 LocalCollection.Cursor.prototype.map = function (callback) {

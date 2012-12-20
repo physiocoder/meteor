@@ -385,7 +385,7 @@ Template.api.find = {
     {name: "fields",
      type: "Object: field specifier",
      type_link: "fieldspecifiers",
-     descr: "(Server only) Dictionary of fields to return or exclude."},
+     descr: "Dictionary of fields to return or exclude."},
     {name: "reactive",
      type: "Boolean",
      descr: "(Client only) Default `true`; pass `false` to disable reactivity"}
@@ -414,7 +414,7 @@ Template.api.findone = {
     {name: "fields",
      type: "Object: field specifier",
      type_link: "fieldspecifiers",
-     descr: "(Server only) Dictionary of fields to return or exclude."},
+     descr: "Dictionary of fields to return or exclude."},
     {name: "reactive",
      type: "Boolean",
      descr: "(Client only) Default true; pass false to disable reactivity"}

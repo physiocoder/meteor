@@ -1030,9 +1030,8 @@ it's up to you to be sure.
 
 {{#api_box_inline fieldspecifiers}}
 
-On the server, queries can specify a particular set of fields to include
-or exclude from the result object.  (The field specifier is currently
-ignored on the client.)
+Queries can specify a particular set of fields to include or exclude from the
+result object.
 
 To exclude certain fields from the result objects, the field specifier
 is a dictionary whose keys are field names and whose values are `0`.
@@ -1042,9 +1041,16 @@ is a dictionary whose keys are field names and whose values are `0`.
 To return an object that only includes the specified field, use `1` as
 the value.  The `_id` field is still included in the result.
 
-    // Users.find({}, {fields: {firstname: 1, lastname: 1}})
+    // Users.find({}, {fields: {firstname: 1, lastname: 1, 'nested.field': 1}})
 
 It is not possible to mix inclusion and exclusion styles.
+
+{{#warning}}
+On the client, all filtering is applied at the top level of the document.  If
+you specify "include `foo.bar`", it is interpreted as "include `foo`", and if
+you specify "exclude `foo.bar`", it is ignored. On the server, specifying dotted
+paths works properly.
+{{/warning}}
 
 {{/api_box_inline}}
 
