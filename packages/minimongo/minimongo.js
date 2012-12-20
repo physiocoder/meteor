@@ -31,6 +31,9 @@ LocalCollection = function (name, bus) {
   // True when observers are paused and we should not send callbacks.
   self.paused = false;
 
+  // We assume that LocalCollections have as long a lifetime as the MessageBus
+  // they are connected to, so we don't save the handles here and never call
+  // stop on them.
   self._bus.listen(name ? {collection: name} : {},
                    _.bind(self._applyMessage, self));
   self._bus.listen({msg: 'done'}, function () {
