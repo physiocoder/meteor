@@ -943,12 +943,7 @@ Tinytest.add("minimongo - modify", function (test) {
     var message = LocalCollection._computeChange(doc, mod);
     var actual = LocalCollection._deepcopy(doc);
     if (message) {
-      _.each(message.fields, function (value, key) {
-        actual[key] = value;
-      });
-      _.each(message.cleared, function (clearKey) {
-        delete actual[clearKey];
-      });
+      LocalCollection._applyChanges(actual, message.fields);
     }
 
     if (!LocalCollection._f._equal(actual, result)) {

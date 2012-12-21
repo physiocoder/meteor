@@ -292,12 +292,11 @@ LocalCollection._computeChange = function (doc, mod) {
 
   var message = {msg: 'changed', id: doc._id};
   var changeFields = {};
-  var clearFields = [];
 
   LocalCollection._diffObjects(doc, newDoc, {
     leftOnly: function (key, leftValue) {
       if (key !== '_id')
-        clearFields.push(key);
+        changeFields[key] = undefined;
     },
     rightOnly: function (key, rightValue) {
       if (key !== '_id')
@@ -308,15 +307,11 @@ LocalCollection._computeChange = function (doc, mod) {
         changeFields[key] = rightValue;
     }
   });
-  if (!_.isEmpty(changeFields))
+  if (!_.isEmpty(changeFields)) {
     message.fields = changeFields;
-  if (!_.isEmpty(clearFields))
-    message.cleared = clearFields;
-  // No-op change.
-  if (!(message.fields || message.cleared))
-    return null;
-
-  return message;
+    return message;
+  }
+  return null;
 };
 
 })();

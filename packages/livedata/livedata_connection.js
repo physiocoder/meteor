@@ -9,6 +9,20 @@ if (Meteor.isServer) {
 // we can't do recursive Meteor.autosubscribe().
 var captureSubs = null;
 
+var parseDDP = function (stringMessage) {
+  var msg = JSON.parse(stringMessage);
+  //massage msg to get it into "abstract ddp" rather than "wire ddp" format.
+  if (_.has(msg, 'cleared')) {
+    if (!_.has(msg, 'fields'))
+      msg.fields = {};
+    _.each(msg.cleared, function (clearKey) {
+      msg.fields[clearKey] = undefined;
+    });
+    delete msg.cleared;
+  }
+  return msg;
+};
+
 // @param url {String|Object} URL to Meteor app,
 //   or an object as a test hook (see code)
 // Options:
@@ -176,7 +190,7 @@ Meteor._LivedataConnection = function (url, options) {
 
   self._stream.on('message', function (raw_msg) {
     try {
-      var msg = JSON.parse(raw_msg);
+      var msg = parseDDP(raw_msg);
     } catch (err) {
       Meteor._debug("discarding message with invalid JSON", raw_msg);
       return;
@@ -971,12 +985,7 @@ _.extend(Meteor._LivedataConnection.prototype, {
         throw new Error("It doesn't make sense to be changing something we don't think exists: "
                         + msg.id);
       }
-      _.each(msg.fields, function (value, key) {
-        serverDoc.document[key] = value;
-      });
-      _.each(msg.cleared, function (clearedKey) {
-        delete serverDoc.document[clearedKey];
-      });
+      LocalCollection._applyChanges(serverDoc.document, msg.fields);
     } else {
       self._pushUpdate(updates, msg.collection, msg);
     }

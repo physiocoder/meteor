@@ -45,6 +45,14 @@ LocalCollection = function (name, bus) {
   });
 };
 
+LocalCollection._applyChanges = function (doc, changeFields) {
+  _.each(changeFields, function (value, key) {
+    if (value === undefined)
+      delete doc[key];
+    else
+      doc[key] = value;
+  });
+};
 // options may include sort, skip, limit, reactive
 // sort may be any of these forms:
 //     {a: 1, b: -1}
@@ -551,12 +559,7 @@ LocalCollection.prototype._applyChanged = function (message) {
   var oldDoc = LocalCollection._deepcopy(doc);
 
   // the actual mutation
-  _.each(message.fields, function (value, key) {
-    doc[key] = value;
-  });
-  _.each(message.cleared, function (clearKey) {
-    delete doc[clearKey];
-  });
+  LocalCollection._applyChanges(doc, message.fields);
 
   // trigger live queries that match
   _.each(self.queries, function (query) {
