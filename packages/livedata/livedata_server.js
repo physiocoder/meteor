@@ -23,7 +23,7 @@ _.extend(Meteor._SessionDocumentView.prototype, {
     return ret;
   },
 
-  clearField: function (subscriptionId, key, changeCollector, clearCollector) {
+  clearField: function (subscriptionId, key, changeCollector) {
     var self = this;
     // Publish API ignores _id if present in fields
     if (key === "_id")
@@ -46,7 +46,7 @@ _.extend(Meteor._SessionDocumentView.prototype, {
     }
     if (_.isEmpty(precedenceList)) {
       delete self.dataByKey[key];
-      clearCollector.push(key);
+      changeCollector[key] = undefined;
     } else if (removedValue !== undefined &&
                !_.isEqual(removedValue, precedenceList[0].value)) {
       changeCollector[key] = precedenceList[0].value;
@@ -117,7 +117,6 @@ _.extend(Meteor._SessionCollectionView.prototype, {
   diffDocument: function (id, prevDV, nowDV) {
     var self = this;
     var fields = {};
-    var cleared = [];
     LocalCollection._diffObjects(prevDV.getFields(), nowDV.getFields(), {
       both: function (key, prev, now) {
         if (!_.isEqual(prev, now))
@@ -127,10 +126,10 @@ _.extend(Meteor._SessionCollectionView.prototype, {
         fields[key] = now;
       },
       leftOnly: function(key, prev) {
-        cleared.push(prev);
+        fields[key] = undefined;
       }
     });
-    self.callbacks.changed(self.collectionName, id, fields, cleared);
+    self.callbacks.changed(self.collectionName, id, fields);
   },
 
   added: function (subscriptionId, id, fields) {
@@ -150,23 +149,22 @@ _.extend(Meteor._SessionCollectionView.prototype, {
     if (added)
       self.callbacks.added(self.collectionName, id, changeCollector);
     else
-      self.callbacks.changed(self.collectionName, id, changeCollector, []);
+      self.callbacks.changed(self.collectionName, id, changeCollector);
   },
 
-  changed: function (subscriptionId, id, changed, cleared) {
+  changed: function (subscriptionId, id, changed) {
     var self = this;
     var changedResult = {};
-    var clearedResult = [];
     var docView = self.documents[id];
     if (!docView)
       throw new Error("Could not find element with id " + id + " to change");
     _.each(changed, function (value, key) {
-      docView.changeField(subscriptionId, key, value, changedResult);
+      if (value === undefined)
+        docView.clearField(subscriptionId, key, changedResult);
+      else
+        docView.changeField(subscriptionId, key, value, changedResult);
     });
-    _.each(cleared, function (clearKey) {
-      docView.clearField(subscriptionId, clearKey, changedResult, clearedResult);
-    });
-    self.callbacks.changed(self.collectionName, id, changedResult, clearedResult);
+    self.callbacks.changed(self.collectionName, id, changedResult);
   },
 
   removed: function (subscriptionId, id) {
@@ -182,14 +180,13 @@ _.extend(Meteor._SessionCollectionView.prototype, {
       delete self.documents[id];
     } else {
       var changed = {};
-      var cleared = [];
       // remove this subscription from every precedence list
       // and record the changes
       _.each(docView.dataByKey, function (precedenceList, key) {
-        docView.clearField(subscriptionId, key, changed, cleared);
+        docView.clearField(subscriptionId, key, changed);
       });
 
-      self.callbacks.changed(self.collectionName, id, changed, cleared);
+      self.callbacks.changed(self.collectionName, id, changed);
     }
   }
 });
@@ -256,14 +253,23 @@ _.extend(Meteor._LivedataSession.prototype, {
       self.send({msg: "added", collection: collectionName, id: id, fields: fields});
   },
 
-  sendChanged: function (collectionName, id, fields, cleared) {
+  sendChanged: function (collectionName, id, fields) {
     var self = this;
-    if (_.isEmpty(fields) && _.isEmpty(cleared))
+    var cleared = [];
+    var messageFields = {};
+    if (_.isEmpty(fields))
       return;
+    // convert internal format (undefined is clear) to wire format (list of clear)
+    _.each(fields, function (value, key) {
+      if (value === undefined)
+        cleared.push(key);
+      else
+        messageFields[key] = value;
+    });
     if (self._isSending) {
       var toSend = {msg: "changed", collection: collectionName, id: id};
-      if (!_.isEmpty(fields))
-        toSend.fields = fields;
+      if (!_.isEmpty(messageFields))
+        toSend.fields = messageFields;
       if (!_.isEmpty(cleared))
         toSend.cleared = cleared;
       self.send(toSend);
@@ -314,15 +320,7 @@ _.extend(Meteor._LivedataSession.prototype, {
   changed: function (subscriptionId, collectionName, id, fields) {
     var self = this;
     var view = self.getCollectionView(collectionName);
-    var changedFields = {};
-    var clearedFields = [];
-    _.each(fields, function (value, key) {
-      if (value === undefined)
-        clearedFields.push(key);
-      else
-        changedFields[key] = value;
-    });
-    view.changed(subscriptionId, id, changedFields, clearedFields);
+    view.changed(subscriptionId, id, fields);
   },
   // Connect a new socket to this session, displacing (and closing)
   // any socket that was previously connected
