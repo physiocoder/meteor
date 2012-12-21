@@ -405,7 +405,15 @@ Fiber(function () {
     name: "bundle",
     help: "Pack this project up into a tarball",
     func: function (argv) {
-      if (argv.help || argv._.length != 1) {
+      var opt = require('optimist')
+        .boolean('omit-dependencies');
+      var new_argv = opt.argv;
+
+      /* --omit-dependencies is an undocumented option that leaves
+           dev_bundle (really just node modules) out of the bundle,
+           just like we were doing a deploy. */
+
+      if (argv.help || new_argv._.length != 2) {
         process.stdout.write(
           "Usage: meteor bundle <output_file.tar.gz>\n" +
             "\n" +
@@ -428,10 +436,12 @@ Fiber(function () {
       var app_dir = path.resolve(require_project("bundle"));
       var build_dir = path.join(app_dir, '.meteor', 'local', 'build_tar');
       var bundle_path = path.join(build_dir, 'bundle');
-      var output_path = path.resolve(argv._[0]); // get absolute path
+      var output_path = path.resolve(new_argv._[1]); // get absolute path
 
       var bundler = require(path.join(__dirname, '..', 'lib', 'bundler.js'));
-      var errors = bundler.bundle(app_dir, bundle_path);
+      var errors = bundler.bundle(app_dir, bundle_path, {
+        skip_dev_bundle: new_argv['omit-dependencies']
+      });
       if (errors) {
         process.stdout.write("Errors prevented bundling:\n");
         _.each(errors, function (e) {

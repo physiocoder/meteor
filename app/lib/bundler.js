@@ -571,6 +571,16 @@ _.extend(Bundle.prototype, {
 "require(require('path').join(__dirname, 'server', 'server.js'));\n");
 
     fs.writeFileSync(path.join(build_path, 'README'),
+
+dev_bundle_mode === "skip" ?
+
+"This is a Meteor application bundle. It was build with the\n" +
+"--omit-dependencies option, so it cannot run standalone.\n" +
+"\n" +
+"Find out more about Meteor at meteor.com.\n"
+
+:
+
 "This is a Meteor application bundle. It has only one dependency,\n" +
 "node.js (with the 'fibers' package). To run the application:\n" +
 "\n" +
