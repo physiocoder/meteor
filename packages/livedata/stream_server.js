@@ -1,4 +1,4 @@
-Meteor._StreamServer = function () {
+Meteor._DdpStreamServer = function () {
   var self = this;
   self.registration_callbacks = [];
   self.open_sockets = [];
@@ -57,7 +57,7 @@ Meteor._StreamServer = function () {
 
 };
 
-_.extend(Meteor._StreamServer.prototype, {
+_.extend(Meteor._DdpStreamServer.prototype, {
   // call my callback when a new socket connects.
   // also call it for all current connections.
   register: function (callback) {
