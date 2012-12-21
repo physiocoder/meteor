@@ -1,6 +1,7 @@
 (function () {
 if (Meteor.isServer) {
   // XXX namespacing
+  var path = __meteor_bootstrap__.require('path');
   var Future = __meteor_bootstrap__.require(path.join('fibers', 'future'));
 }
 
