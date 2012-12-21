@@ -17,13 +17,16 @@ Package.on_use(function (api, where) {
     'uuid.js',
     'modify.js',
     'diff.js',
-    'message_bus.js'
+    'message_bus.js',
+    'observe_changes.js'
   ], where);
 });
 
 Package.on_test(function (api) {
   api.use('minimongo', 'client');
   api.use('tinytest');
+  api.use('test-helpers');
   api.add_files('minimongo_tests.js', 'client');
   api.add_files('message_bus_tests.js', 'client');
+  api.add_files('observe_changes_tests.js', 'client');
 });

@@ -294,7 +294,7 @@ LocalCollection._computeChange = function (doc, mod) {
   var changeFields = {};
   var clearFields = [];
 
-  diffObjects(doc, newDoc, {
+  LocalCollection._diffObjects(doc, newDoc, {
     leftOnly: function (key, leftValue) {
       if (key !== '_id')
         clearFields.push(key);
@@ -317,22 +317,6 @@ LocalCollection._computeChange = function (doc, mod) {
     return null;
 
   return message;
-};
-
-// XXX copy/paste from livedata_server.js; should go in a util place.
-var diffObjects = function (left, right, callbacks) {
-  _.each(left, function (leftValue, key) {
-    if (_.has(right, key))
-      callbacks.both && callbacks.both(key, leftValue, right[key]);
-    else
-      callbacks.leftOnly && callbacks.leftOnly(key, leftValue);
-  });
-  if (callbacks.rightOnly) {
-    _.each(right, function(rightValue, key) {
-      if (!_.has(left, key))
-        callbacks.rightOnly(key, rightValue);
-    });
-  }
 };
 
 })();

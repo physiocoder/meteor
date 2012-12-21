@@ -34,8 +34,7 @@ LocalCollection = function (name, bus) {
   // We assume that LocalCollections have as long a lifetime as the MessageBus
   // they are connected to, so we don't save the handles here and never call
   // stop on them.
-  self._bus.listen(name ? {collection: name} : {},
-                   _.bind(self._applyMessage, self));
+  self._listenWithCollection({}, _.bind(self._applyMessage, self));
   self._bus.listen({msg: 'done'}, function () {
     _.each(self.queries, function(query) {
       if (query.needsRecompute) {
@@ -136,6 +135,12 @@ LocalCollection.Cursor.prototype.rewind = function () {
   var self = this;
   self.db_objects = null;
   self.cursor_pos = 0;
+};
+
+LocalCollection.prototype._listenWithCollection = function (trigger, callback) {
+  var self = this;
+  return self._bus.listen(
+    self._name ? _.extend({collection: self._name}, trigger) : trigger, callback);
 };
 
 LocalCollection.prototype.findOne = function (selector, options) {

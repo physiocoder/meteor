@@ -36,7 +36,9 @@ _.extend(TestCaseResults.prototype, {
 
   fail: function (doc) {
     var self = this;
-
+    if (typeof doc === 'string') {
+      doc = {message: doc};
+    }
     if (self.stop_at_offset === 0) {
       if (Meteor.isClient) {
         // Only supported on the browser for now..

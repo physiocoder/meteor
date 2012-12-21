@@ -5,27 +5,6 @@
 
 (function () {
 
-// General helper for diff-ing two objects.
-// callbacks is an object like so:
-// { leftOnly: function (key, leftValue) {...},
-//   rightOnly: function (key, rightValue) {...},
-//   both: function (key, leftValue, rightValue) {...},
-// }
-var diffObjects = function (left, right, callbacks) {
-  _.each(left, function (leftValue, key) {
-    if (_.has(right, key))
-      callbacks.both && callbacks.both(key, leftValue, right[key]);
-    else
-      callbacks.leftOnly && callbacks.leftOnly(key, leftValue);
-  });
-  if (callbacks.rightOnly) {
-    _.each(right, function(rightValue, key) {
-      if (!_.has(left, key))
-        callbacks.rightOnly(key, rightValue);
-    });
-  }
-};
-
 
 Meteor._SessionDocumentView = function () {
   var self = this;
@@ -122,7 +101,7 @@ _.extend(Meteor._SessionCollectionView.prototype, {
 
   diff: function (previous) {
     var self = this;
-    diffObjects(previous.documents, self.documents, {
+    LocalCollection._diffObjects(previous.documents, self.documents, {
       both: _.bind(self.diffDocument, self),
 
       rightOnly: function (id, nowDV) {
@@ -139,7 +118,7 @@ _.extend(Meteor._SessionCollectionView.prototype, {
     var self = this;
     var fields = {};
     var cleared = [];
-    diffObjects(prevDV.getFields(), nowDV.getFields(), {
+    LocalCollection._diffObjects(prevDV.getFields(), nowDV.getFields(), {
       both: function (key, prev, now) {
         if (!_.isEqual(prev, now))
           fields[key] = now;
@@ -633,7 +612,7 @@ _.extend(Meteor._LivedataSession.prototype, {
 
   _diffCollectionViews: function (beforeCVs) {
     var self = this;
-    diffObjects(beforeCVs, self.collectionViews, {
+    LocalCollection._diffObjects(beforeCVs, self.collectionViews, {
       both: function (collectionName, leftValue, rightValue) {
         rightValue.diff(leftValue);
       },

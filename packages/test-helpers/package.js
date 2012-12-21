@@ -20,6 +20,7 @@ Package.on_use(function (api, where) {
   api.add_files('onscreendiv.js', where);
   api.add_files('wrappedfrag.js', where);
   api.add_files('current_style.js', where);
+  api.add_files('callback_logger.js', where);
   api.add_files('reactivevar.js', where);
 });
 
