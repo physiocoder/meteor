@@ -151,7 +151,7 @@ Meteor._LivedataConnection = function (url, options) {
   self._userIdListeners = Meteor.deps && new Meteor.deps._ContextSet;
 
   // Block auto-reload while we're waiting for method responses.
-  if (!options.reloadWithOutstanding) {
+  if (Meteor._reload && !options.reloadWithOutstanding) {
     Meteor._reload.onMigrate(function (retry) {
       if (!self._readyToMigrate()) {
         if (self._retryMigrate)
@@ -238,7 +238,7 @@ Meteor._LivedataConnection = function (url, options) {
     });
   });
 
-  if (options.reloadOnUpdate) {
+  if (Meteor._reload && options.reloadOnUpdate) {
     self._stream.on('update_available', function () {
       // Start trying to migrate to a new version. Until all packages
       // signal that they're ready for a migration, the app will
