@@ -3,7 +3,7 @@
 set -e
 set -u
 
-BUNDLE_VERSION=0.2.12
+BUNDLE_VERSION=0.2.13
 UNAME=$(uname)
 ARCH=$(uname -m)
 
@@ -99,6 +99,7 @@ npm install sockjs@0.3.4
 npm install http-proxy@0.8.5
 npm install underscore@1.4.2
 npm install tar@0.1.14
+npm install websocket@1.0.7
 
 # progress 0.1.0 has a regression where it opens stdin and thus does not
 # allow the node process to exit cleanly. See

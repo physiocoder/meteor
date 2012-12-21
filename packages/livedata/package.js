@@ -4,8 +4,17 @@ Package.describe({
 });
 
 Package.on_use(function (api) {
-  api.use(['stream', 'uuid']);
+  api.use(['uuid']);
   api.use(['json', 'underscore', 'deps', 'logging'], ['client', 'server']);
+
+  // Transport
+  api.use(['underscore', 'logging', 'uuid', 'json'], ['client', 'server']);
+  api.use('reload', 'client');
+  api.add_files(['sockjs-0.3.4.js',
+                 'stream_client_sockjs.js'], 'client');
+  api.add_files('stream_client_nodejs.js', 'server');
+  api.add_files('stream_server.js', 'server');
+
 
   // livedata_connection.js uses a Minimongo collection internally to
   // manage the current set of subscriptions.
@@ -34,4 +43,7 @@ Package.on_test(function (api) {
   api.add_files('livedata_connection_tests.js', ['client']);
   api.add_files('livedata_tests.js', ['client', 'server']);
   api.add_files('livedata_test_service.js', ['client', 'server']);
+
+  api.use('http', 'client');
+  api.add_files(['stream_tests.js'], 'client');
 });

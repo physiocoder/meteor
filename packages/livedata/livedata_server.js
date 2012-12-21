@@ -652,7 +652,7 @@ Meteor._LivedataServer = function () {
 
   self.sessions = {}; // map from id to session
 
-  self.stream_server = new Meteor._StreamServer;
+  self.stream_server = new Meteor._DdpStreamServer;
 
   self.stream_server.register(function (socket) {
     socket.meteor_session = null;
