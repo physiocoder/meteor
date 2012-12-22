@@ -406,7 +406,8 @@ Fiber(function () {
     help: "Pack this project up into a tarball",
     func: function (argv) {
       var opt = require('optimist')
-        .boolean('omit-dependencies');
+        .boolean('omit-dependencies')
+        .boolean('debug');
       var new_argv = opt.argv;
 
       /* --omit-dependencies is an undocumented option that leaves
@@ -415,11 +416,15 @@ Fiber(function () {
 
       if (argv.help || new_argv._.length != 2) {
         process.stdout.write(
-          "Usage: meteor bundle <output_file.tar.gz>\n" +
-            "\n" +
-            "Package this project up for deployment. The output is a tarball that\n" +
-            "includes everything necessary to run the application. See README in\n" +
-            "the tarball for details.\n");
+"Usage: meteor bundle <output_file.tar.gz> [--debug]\n" +
+"\n" +
+"Package this project up for deployment. The output is a tarball that\n" +
+"includes everything necessary to run the application. See README in\n" +
+"the tarball for details.\n" +
+"\n" +
+"Pass --debug to create a debugging bundle rather than a production bundle.\n" +
+"Debugging bundles include the full, human-readable source code to your\n" +
+"application.\n");
         process.exit(1);
       }
 
@@ -440,7 +445,8 @@ Fiber(function () {
 
       var bundler = require(path.join(__dirname, '..', 'lib', 'bundler.js'));
       var errors = bundler.bundle(app_dir, bundle_path, {
-        skip_dev_bundle: new_argv['omit-dependencies']
+        skip_dev_bundle: new_argv['omit-dependencies'],
+        no_minify: new_argv.debug
       });
       if (errors) {
         process.stdout.write("Errors prevented bundling:\n");
