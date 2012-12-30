@@ -18,7 +18,8 @@ Package.on_use(function (api, where) {
     'modify.js',
     'diff.js',
     'message_bus.js',
-    'observe_changes.js'
+    'observe_changes.js',
+    'objectid.js'
   ], where);
 });
 
