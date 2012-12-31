@@ -420,7 +420,7 @@ LocalCollection.prototype.insert = function (doc) {
     delete message.fields._id;
   } else {
     //XXX
-    id = message.id = LocalCollection.uuid();
+    id = message.id = LocalCollection._idToDDP(new LocalCollection._ObjectID());
   }
 
   if (_.has(self.docs, id))
@@ -435,8 +435,9 @@ LocalCollection.prototype.remove = function (selector) {
 
   // Avoid O(n) for "remove a single doc by ID".
   if (LocalCollection._selectorIsId(selector)) {
-    if (_.has(self.docs, selector))
-      remove.push(selector);
+    var strId = LocalCollection._idToDDP(selector);
+    if (_.has(self.docs, strId))
+      remove.push(strId);
   } else {
     var selector_f = LocalCollection._compileSelector(selector);
     for (var id in self.docs) {
