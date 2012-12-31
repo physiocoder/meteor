@@ -83,9 +83,9 @@ LocalCollection.Cursor = function (collection, selector, options) {
 
   self.collection = collection;
 
-  if ((typeof selector === "string") || (typeof selector === "number")) {
+  if ((typeof selector === "string") || (typeof selector === "number") || selector instanceof LocalCollection._ObjectID) {
     // stash for fast path
-    self.selector_id = selector;
+    self.selector_id = LocalCollection._idToDDP(selector);
     self.selector_f = LocalCollection._compileSelector(selector);
   } else {
     self.selector_f = LocalCollection._compileSelector(selector);
@@ -414,14 +414,16 @@ LocalCollection.prototype.insert = function (doc) {
   var self = this;
 
   var message = {msg: 'added', fields: LocalCollection._deepcopy(doc)};
+  var id;
   if (_.has(message.fields, '_id')) {
-    message.id = message.fields._id;
+    id = message.id = LocalCollection._idToDDP(message.fields._id);
     delete message.fields._id;
   } else {
-    message.id = LocalCollection.uuid();
+    //XXX
+    id = message.id = LocalCollection.uuid();
   }
 
-  if (_.has(self.docs, message.id))
+  if (_.has(self.docs, id))
     throw new Error("Duplicate _id '" + message.id + "'");
 
   self._applyMessages([message]);
@@ -510,7 +512,7 @@ LocalCollection.prototype._applyAdded = function (message) {
     throw new Error("Unexpected added for ID " + message.id);
 
   self._saveOriginal(message.id, undefined);
-  var doc = self.docs[message.id] = _.extend({_id: message.id}, message.fields);
+  var doc = self.docs[message.id] = _.extend({_id: LocalCollection._idFromDDP(message.id)}, message.fields);
 
 
 
@@ -551,8 +553,9 @@ LocalCollection.prototype._applyRemoved = function (message) {
 
 LocalCollection.prototype._applyChanged = function (message) {
   var self = this;
-  if (!_.has(self.docs, message.id))
+  if (!_.has(self.docs, message.id)) {
     throw new Error("Unexpected changed for ID " + message.id);
+  }
   var doc = self.docs[message.id];
 
   self._saveOriginal(message.id, doc);
@@ -631,7 +634,7 @@ LocalCollection._insertInResults = function (query, doc) {
     }
   } else {
     query.added(LocalCollection._deepcopy(doc));
-    query.results[doc._id] = LocalCollection._deepcopy(doc);
+    query.results[LocalCollection._idToDDP(doc._id)] = LocalCollection._deepcopy(doc);
   }
 };
 
@@ -641,22 +644,23 @@ LocalCollection._removeFromResults = function (query, doc) {
     query.removed(doc, i);
     query.results.splice(i, 1);
   } else {
-    var id = doc._id;  // in case callback mutates doc
+    var id = LocalCollection._idToDDP(doc._id);  // in case callback mutates doc
     query.removed(doc);
     delete query.results[id];
   }
 };
 
 LocalCollection._updateInResults = function (query, doc, old_doc) {
-  if (doc._id !== old_doc._id)
+  if (!_.isEqual(doc._id, old_doc._id))
     throw new Error("Can't change a doc's _id while updating");
 
   if (!query.ordered) {
     query.changed(LocalCollection._deepcopy(doc), old_doc);
-    query.results[doc._id] = LocalCollection._deepcopy(doc);
+    query.results[LocalCollection._idToDDP(doc._id)] = LocalCollection._deepcopy(doc);
     return;
   }
 
+  //XXX
   var orig_idx = LocalCollection._findInOrderedResults(query, doc);
   query.changed(LocalCollection._deepcopy(doc), orig_idx, old_doc);
 
@@ -697,7 +701,7 @@ LocalCollection._findInOrderedResults = function (query, doc) {
   if (!query.ordered)
     throw new Error("Can't call _findInOrderedResults on unordered query");
   for (var i = 0; i < query.results.length; i++)
-    if (query.results[i]._id === doc._id)
+    if (_.isEqual(query.results[i]._id, doc._id))
       return i;
   throw Error("object missing from query");
 };
