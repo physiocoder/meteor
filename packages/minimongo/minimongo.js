@@ -589,6 +589,7 @@ LocalCollection.prototype._applyChanged = function (message) {
 // XXX findandmodify
 
 LocalCollection._deepcopy = function (v) {
+  var ret;
   if (typeof v !== "object")
     return v;
   if (v === null)
@@ -596,12 +597,17 @@ LocalCollection._deepcopy = function (v) {
   if (v instanceof Date)
     return new Date(v.getTime());
   if (_.isArray(v)) {
-    var ret = v.slice(0);
+    ret = v.slice(0);
     for (var i = 0; i < v.length; i++)
       ret[i] = LocalCollection._deepcopy(ret[i]);
     return ret;
   }
-  var ret = {};
+  // handle general user-defined typed Objects if they have a clone method
+  if (typeof v.clone === 'function') {
+    return v.clone();
+  }
+  // handle other objects
+  ret = {};
   for (var key in v)
     ret[key] = LocalCollection._deepcopy(v[key]);
   return ret;
