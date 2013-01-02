@@ -419,7 +419,6 @@ LocalCollection.prototype.insert = function (doc) {
     id = message.id = LocalCollection._idToDDP(message.fields._id);
     delete message.fields._id;
   } else {
-    //XXX
     id = message.id = LocalCollection._idToDDP(new LocalCollection._ObjectID());
   }
 
