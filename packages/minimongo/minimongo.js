@@ -803,7 +803,7 @@ LocalCollection.prototype.resumeObservers = function () {
 };
 
 
-var idStringify = LocalCollection._idStringify = function (id) {
+LocalCollection._idStringify = function (id) {
   if (id instanceof LocalCollection._findObjectIDClass()) {
     return id.valueOf();
   } else if (typeof id === 'string') {
@@ -828,7 +828,7 @@ var idStringify = LocalCollection._idStringify = function (id) {
 
 
 
-var idParse = LocalCollection._idParse = function (id) {
+LocalCollection._idParse = function (id) {
   if (id === "") {
     return id;
   } else if (id === '-') {
@@ -843,5 +843,10 @@ var idParse = LocalCollection._idParse = function (id) {
     return id;
   }
 };
+
+if (typeof Meteor !== 'undefined') {
+  Meteor.idParse = LocalCollection._idParse;
+  Meteor.idStringify = LocalCollection._idStringify;
+}
 
 })();
