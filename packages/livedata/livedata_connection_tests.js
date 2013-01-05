@@ -231,7 +231,7 @@ Tinytest.add("livedata stub - methods", function (test) {
   test.equal(counts, {added: 1, removed: 0, changed: 0, moved: 0});
 
   // data methods do not show up (not quiescent yet)
-  stream.receive({msg: 'added', collection: collName, id: LocalCollection._idToDDP(docId),
+  stream.receive({msg: 'added', collection: collName, id: LocalCollection._idStringify(docId),
                   fields: {value: 'tuesday'}});
   test.equal(coll.find({}).count(), 1);
   test.equal(coll.find({value: 'friday!'}).count(), 1);
@@ -339,7 +339,7 @@ Tinytest.add("livedata stub - methods calling methods", function (test) {
 
   // get data from the method. data from this doc does not show up yet, but data
   // from another doc does.
-  stream.receive({msg: 'added', collection: coll_name, id: LocalCollection._idToDDP(docId),
+  stream.receive({msg: 'added', collection: coll_name, id: LocalCollection._idStringify(docId),
                   fields: {value: 'tuesday'}});
   o.expectCallbacks();
   test.equal(coll.findOne(docId), {_id: docId, a: 1});
@@ -550,7 +550,7 @@ Tinytest.add("livedata stub - reconnect method which only got result", function 
 
   // Get some data.
   stream.receive({msg: 'added', collection: collName,
-                  id: LocalCollection._idToDDP(stubWrittenId), fields: {baz: 42}});
+                  id: LocalCollection._idStringify(stubWrittenId), fields: {baz: 42}});
   // It doesn't show up yet.
   test.equal(coll.find().count(), 1);
   test.equal(coll.findOne(stubWrittenId), {_id: stubWrittenId, foo: 'bar'});
@@ -585,7 +585,7 @@ Tinytest.add("livedata stub - reconnect method which only got result", function 
   test.equal(callbackOutput, ['bla']);
   test.equal(onResultReceivedOutput, ['bla']);
   stream.receive({msg: 'added', collection: collName,
-                  id: LocalCollection._idToDDP(stubWrittenId), fields: {baz: 42}});
+                  id: LocalCollection._idStringify(stubWrittenId), fields: {baz: 42}});
   test.equal(coll.findOne(stubWrittenId), {_id: stubWrittenId, baz: 42});
   o.expectCallbacks({added: 1});
 
@@ -617,7 +617,7 @@ Tinytest.add("livedata stub - reconnect method which only got result", function 
 
   // Get some data.
   stream.receive({msg: 'added', collection: collName,
-                  id: LocalCollection._idToDDP(stubWrittenId2), fields: {baz: 42}});
+                  id: LocalCollection._idStringify(stubWrittenId2), fields: {baz: 42}});
   // It doesn't show up yet.
   test.equal(coll.find().count(), 2);
   test.equal(coll.findOne(stubWrittenId2), {_id: stubWrittenId2, foo: 'bar'});
@@ -661,7 +661,7 @@ Tinytest.add("livedata stub - reconnect method which only got result", function 
 
   // Receive data matching our stub. It doesn't take effect yet.
   stream.receive({msg: 'added', collection: collName,
-                  id: LocalCollection._idToDDP(stubWrittenId2), fields: {foo: 'bar'}});
+                  id: LocalCollection._idStringify(stubWrittenId2), fields: {foo: 'bar'}});
   o.expectCallbacks();
 
   // slowMethod is done writing, so we get full reconnect quiescence (but no
@@ -817,7 +817,7 @@ Tinytest.add("livedata stub - multiple stubs same doc", function (test) {
 
   // Get some data... slightly different than what we wrote.
   stream.receive({msg: 'added', collection: collName,
-                  id: LocalCollection._idToDDP(stubWrittenId), fields: {foo: 'barb', other: 'field',
+                  id: LocalCollection._idStringify(stubWrittenId), fields: {foo: 'barb', other: 'field',
                                            other2: 'bla'}});
   // It doesn't show up yet.
   test.equal(coll.find().count(), 1);
@@ -835,7 +835,7 @@ Tinytest.add("livedata stub - multiple stubs same doc", function (test) {
 
   // More data. Not quite what we wrote. Also ignored for now.
   stream.receive({msg: 'changed', collection: collName,
-                  id: LocalCollection._idToDDP(stubWrittenId), fields: {baz: 43}, cleared: ['other']});
+                  id: LocalCollection._idStringify(stubWrittenId), fields: {baz: 43}, cleared: ['other']});
   test.equal(coll.find().count(), 1);
   test.equal(coll.findOne(stubWrittenId),
              {_id: stubWrittenId, foo: 'bar', baz: 42});

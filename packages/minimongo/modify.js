@@ -292,7 +292,7 @@ LocalCollection._computeChange = function (doc, mod) {
     });
   }
 
-  var message = {msg: 'changed', id: LocalCollection._idToDDP(doc._id)};
+  var message = {msg: 'changed', id: LocalCollection._idStringify(doc._id)};
   var changeFields = {};
 
   LocalCollection._diffObjects(doc, newDoc, {
