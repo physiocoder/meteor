@@ -85,11 +85,13 @@ LocalCollection.Cursor = function (collection, selector, options) {
 
   self.collection = collection;
 
-  if ((typeof selector === "string") || (typeof selector === "number") || selector instanceof LocalCollection._ObjectID) {
+  if (LocalCollection._selectorIsId(selector)) {
     // stash for fast path
     self.selector_id = LocalCollection._idStringify(selector);
     self.selector_f = LocalCollection._compileSelector(selector);
+    self.sort_f = undefined;
   } else {
+    self.selector_id = undefined;
     self.selector_f = LocalCollection._compileSelector(selector);
     self.sort_f = options.sort ? LocalCollection._compileSort(options.sort) : null;
   }
@@ -416,16 +418,15 @@ LocalCollection.prototype.insert = function (doc) {
   var self = this;
 
   var message = {msg: 'added', fields: LocalCollection._deepcopy(doc)};
-  var id;
   if (_.has(message.fields, '_id')) {
-    id = message.id = LocalCollection._idStringify(message.fields._id);
+    message.id = LocalCollection._idStringify(message.fields._id);
     delete message.fields._id;
   } else {
-    id = message.id = LocalCollection._idStringify(new LocalCollection._ObjectID());
+    message.id = LocalCollection._idStringify(new LocalCollection._ObjectID());
   }
 
-  if (_.has(self.docs, id))
-    throw new Error("Duplicate _id '" + message.id + "'");
+  if (_.has(self.docs, message.id))
+    throw new Error("Duplicate id '" + message.id + "'");
 
   self._applyMessages([message]);
 };
@@ -514,7 +515,9 @@ LocalCollection.prototype._applyAdded = function (message) {
     throw new Error("Unexpected added for ID " + message.id);
 
   self._saveOriginal(message.id, undefined);
-  var doc = self.docs[message.id] = _.extend({_id: LocalCollection._idParse(message.id)}, message.fields);
+  var doc = self.docs[message.id] = _.extend({
+    _id: LocalCollection._idParse(message.id)
+  }, message.fields);
 
 
 
@@ -636,7 +639,8 @@ LocalCollection._insertInResults = function (query, doc) {
     }
   } else {
     query.added(LocalCollection._deepcopy(doc));
-    query.results[LocalCollection._idStringify(doc._id)] = LocalCollection._deepcopy(doc);
+    query.results[LocalCollection._idStringify(doc._id)] =
+      LocalCollection._deepcopy(doc);
   }
 };
 
@@ -658,11 +662,11 @@ LocalCollection._updateInResults = function (query, doc, old_doc) {
 
   if (!query.ordered) {
     query.changed(LocalCollection._deepcopy(doc), old_doc);
-    query.results[LocalCollection._idStringify(doc._id)] = LocalCollection._deepcopy(doc);
+    query.results[LocalCollection._idStringify(doc._id)] =
+      LocalCollection._deepcopy(doc);
     return;
   }
 
-  //XXX
   var orig_idx = LocalCollection._findInOrderedResults(query, doc);
   query.changed(LocalCollection._deepcopy(doc), orig_idx, old_doc);
 
@@ -809,10 +813,10 @@ LocalCollection._idStringify = function (id) {
   } else if (typeof id === 'string') {
     if (id === "") {
       return id;
-    } else if (id[0] === "-" || // escape previously dashed strings
-               id[0] === "~" || // escape escaped numbers, true, false
+    } else if (id.substr(0, 1) === "-" || // escape previously dashed strings
+               id.substr(0, 1) === "~" || // escape escaped numbers, true, false
                LocalCollection._looksLikeObjectID(id) || // escape object-id-form strings
-               id[0] === '{') { // escape object-form strings, for maybe implementing later
+               id.substr(0, 1) === '{') { // escape object-form strings, for maybe implementing later
       return "-" + id;
     } else {
       return id; // other strings go through unchanged.
@@ -833,9 +837,9 @@ LocalCollection._idParse = function (id) {
     return id;
   } else if (id === '-') {
     return undefined;
-  } else if (id[0] === '-') {
+  } else if (id.substr(0, 1) === '-') {
     return id.substr(1);
-  } else if (id[0] === '~') {
+  } else if (id.substr(0, 1) === '~') {
     return JSON.parse(id.substr(1));
   } else if (LocalCollection._looksLikeObjectID(id)) {
     return new (LocalCollection._findObjectIDClass())(id);
