@@ -105,22 +105,17 @@ LocalCollection._f = {
       }
 
       // objects
-/*
-      var unmatched_b_keys = 0;
-      for (var x in b)
-        unmatched_b_keys++;
-      for (var x in a) {
-        if (!(x in b) || !match(a[x], b[x]))
-          return false;
-        unmatched_b_keys--;
-      }
-      return unmatched_b_keys === 0;
-*/
+
       // Follow Mongo in considering key order to be part of
       // equality. Key enumeration order is actually not defined in
       // the ecmascript spec but in practice most implementations
       // preserve it. (The exception is Chrome, which preserves it
       // usually, but not for keys that parse as ints.)
+
+      // use the equality method if it exists
+      if (typeof (a.equals) === 'function' && typeof (b.equals) === 'function') {
+        return a.equals(b);
+      }
       var b_keys = [];
       for (var x in b)
         b_keys.push(x);
@@ -286,11 +281,6 @@ LocalCollection._compileSelector = function (selector) {
   return _func(LocalCollection._f, literals);
 };
 
-// Is this selector just shorthand for lookup by _id?
-LocalCollection._selectorIsId = function (selector) {
-  return (typeof selector === "string") || (typeof selector === "number");
-};
-
 // Given an arbitrary Mongo-style query selector, return an expression
 // that evaluates to true if the document in 'doc' matches the
 // selector, else false.
@@ -446,6 +436,8 @@ LocalCollection._exprForValueTest = function (value, literals) {
     // note that typeof(/a/) === 'function' in javascript
     // XXX improve error
     throw Error("Bad value type in query");
+  } else if (value.serializeForEval) {
+    expr = 'f._equal(x,' + value.serializeForEval() + ')';
   } else {
     // array or literal document
     expr = 'f._equal(x,' + JSON.stringify(value) + ')';

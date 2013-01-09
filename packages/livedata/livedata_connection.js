@@ -9,20 +9,6 @@ if (Meteor.isServer) {
 // we can't do recursive Meteor.autosubscribe().
 var captureSubs = null;
 
-var parseDDP = function (stringMessage) {
-  var msg = JSON.parse(stringMessage);
-  //massage msg to get it into "abstract ddp" rather than "wire ddp" format.
-  if (_.has(msg, 'cleared')) {
-    if (!_.has(msg, 'fields'))
-      msg.fields = {};
-    _.each(msg.cleared, function (clearKey) {
-      msg.fields[clearKey] = undefined;
-    });
-    delete msg.cleared;
-  }
-  return msg;
-};
-
 // @param url {String|Object} URL to Meteor app,
 //   or an object as a test hook (see code)
 // Options:
@@ -190,11 +176,14 @@ Meteor._LivedataConnection = function (url, options) {
 
   self._stream.on('message', function (raw_msg) {
     try {
-      var msg = parseDDP(raw_msg);
-    } catch (err) {
-      Meteor._debug("discarding message with invalid JSON", raw_msg);
+      var msg = Meteor._parseDDP(raw_msg);
+    } catch (e) {
+      Meteor._debug("Exception while parsing DDP", e);
       return;
     }
+    if (msg === null)
+      return;
+
     if (typeof msg !== 'object' || !msg.msg) {
       Meteor._debug("discarding invalid livedata message", msg);
       return;
@@ -706,6 +695,8 @@ _.extend(Meteor._LivedataConnection.prototype, {
     _.each(self._stores, function (s, collection) {
       var originals = s.retrieveOriginals();
       _.each(originals, function (doc, id) {
+        if (typeof id !== 'string')
+          throw new Error("id is not a string");
         docsWritten.push({collection: collection, id: id});
         var serverDoc = Meteor._ensure(self._serverDocuments, collection, id);
         if (serverDoc.writtenByStubs) {
@@ -729,7 +720,7 @@ _.extend(Meteor._LivedataConnection.prototype, {
   // Sends the DDP stringification of the given message object
   _send: function (obj) {
     var self = this;
-    self._stream.send(JSON.stringify(obj));
+    self._stream.send(Meteor._stringifyDDP(obj));
   },
 
   status: function (/*passthrough args*/) {
@@ -970,8 +961,8 @@ _.extend(Meteor._LivedataConnection.prototype, {
         throw new Error("It doesn't make sense to be adding something we know exists: "
                         + msg.id);
       }
-      serverDoc.document = msg.fields;
-      serverDoc.document._id = msg.id;
+      serverDoc.document = msg.fields || {};
+      serverDoc.document._id = Meteor.idParse(msg.id);
     } else {
       self._pushUpdate(updates, msg.collection, msg);
     }

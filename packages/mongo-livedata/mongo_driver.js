@@ -89,7 +89,6 @@ _Mongo.prototype._maybeBeginWrite = function () {
 
 _Mongo.prototype.insert = function (collection_name, document) {
   var self = this;
-
   if (collection_name === "___meteor_failure_test_collection" &&
       document.fail) {
     var e = new Error("Failure test");
@@ -199,7 +198,6 @@ _Mongo.prototype.find = function (collectionName, selector, options) {
 
 _Mongo.prototype.findOne = function (collection_name, selector, options) {
   var self = this;
-
   if (arguments.length === 1)
     selector = {};
 
@@ -376,8 +374,9 @@ _.extend(SynchronousCursor.prototype, {
     while (true) {
       var doc = self._synchronousNextObject().wait();
       if (!doc || !doc._id) return null;
-      if (self._visitedIds[doc._id]) continue;
-      self._visitedIds[doc._id] = true;
+      var strId = Meteor.idStringify(doc._id);
+      if (self._visitedIds[strId]) continue;
+      self._visitedIds[strId] = true;
       return doc;
     }
   },

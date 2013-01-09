@@ -1,5 +1,10 @@
+
+// Hack to make LocalCollection generate ObjectIDs by default.
+LocalCollection._useOID = true;
+
 // assert that f is a strcmp-style comparison function that puts
 // 'values' in the provided order
+
 var assert_ordering = function (test, f, values) {
   for (var i = 0; i < values.length; i++) {
     var x = f(values[i], values[i]);
@@ -1477,6 +1482,31 @@ Tinytest.add("minimongo - saveOriginals errors", function (test) {
   c.saveOriginals();
   // Can't call save twice.
   test.throws(function () { c.saveOriginals(); });
+});
+
+Tinytest.add("minimongo - objectid transformation", function (test) {
+  var testId = function (item) {
+    test.equal(item, LocalCollection._idParse(LocalCollection._idStringify(item)));
+  };
+  var randomOid = new LocalCollection._ObjectID();
+  testId(randomOid);
+  testId("FOO");
+  testId("ffffffffffff");
+  testId("0987654321abcdef09876543");
+  testId(new LocalCollection._ObjectID());
+  testId("--a string");
+
+  test.equal("ffffffffffff", LocalCollection._idParse(LocalCollection._idStringify("ffffffffffff")));
+});
+
+
+Tinytest.add("minimongo - objectid", function (test) {
+  var randomOid = new LocalCollection._ObjectID();
+  var anotherRandomOid = new LocalCollection._ObjectID();
+  test.notEqual(randomOid, anotherRandomOid);
+  test.throws(function() { new LocalCollection._ObjectID("qqqqqqqqqqqqqqqqqqqqqqqq");});
+  test.throws(function() { new LocalCollection._ObjectID("ABCDEF"); });
+  test.equal(randomOid, new LocalCollection._ObjectID(randomOid.valueOf()));
 });
 
 Tinytest.add("minimongo - pause", function (test) {

@@ -1,3 +1,5 @@
+(function () {
+
 // XXX type checking on selectors (graceful error if malformed)
 
 // LocalCollection: a set of documents that supports queries and modifiers.
@@ -83,11 +85,13 @@ LocalCollection.Cursor = function (collection, selector, options) {
 
   self.collection = collection;
 
-  if ((typeof selector === "string") || (typeof selector === "number")) {
+  if (LocalCollection._selectorIsId(selector)) {
     // stash for fast path
-    self.selector_id = selector;
+    self.selector_id = LocalCollection._idStringify(selector);
     self.selector_f = LocalCollection._compileSelector(selector);
+    self.sort_f = undefined;
   } else {
+    self.selector_id = undefined;
     self.selector_f = LocalCollection._compileSelector(selector);
     self.sort_f = options.sort ? LocalCollection._compileSort(options.sort) : null;
   }
@@ -415,14 +419,18 @@ LocalCollection.prototype.insert = function (doc) {
 
   var message = {msg: 'added', fields: LocalCollection._deepcopy(doc)};
   if (_.has(message.fields, '_id')) {
-    message.id = message.fields._id;
+    message.id = LocalCollection._idStringify(message.fields._id);
     delete message.fields._id;
   } else {
-    message.id = LocalCollection.uuid();
+    // if you really want to use ObjectIDs, set this global.
+    // Meteor.Collection specifies its own ids and does not use this code.
+    message.id = LocalCollection._idStringify(LocalCollection._useOID
+                                              ? new LocalCollection._ObjectID()
+                                              : LocalCollection.id());
   }
 
   if (_.has(self.docs, message.id))
-    throw new Error("Duplicate _id '" + message.id + "'");
+    throw new Error("Duplicate id '" + message.id + "'");
 
   self._applyMessages([message]);
 };
@@ -433,8 +441,9 @@ LocalCollection.prototype.remove = function (selector) {
 
   // Avoid O(n) for "remove a single doc by ID".
   if (LocalCollection._selectorIsId(selector)) {
-    if (_.has(self.docs, selector))
-      remove.push(selector);
+    var strId = LocalCollection._idStringify(selector);
+    if (_.has(self.docs, strId))
+      remove.push(strId);
   } else {
     var selector_f = LocalCollection._compileSelector(selector);
     for (var id in self.docs) {
@@ -510,7 +519,9 @@ LocalCollection.prototype._applyAdded = function (message) {
     throw new Error("Unexpected added for ID " + message.id);
 
   self._saveOriginal(message.id, undefined);
-  var doc = self.docs[message.id] = _.extend({_id: message.id}, message.fields);
+  var doc = self.docs[message.id] = _.extend({
+    _id: LocalCollection._idParse(message.id)
+  }, message.fields);
 
 
 
@@ -551,8 +562,9 @@ LocalCollection.prototype._applyRemoved = function (message) {
 
 LocalCollection.prototype._applyChanged = function (message) {
   var self = this;
-  if (!_.has(self.docs, message.id))
+  if (!_.has(self.docs, message.id)) {
     throw new Error("Unexpected changed for ID " + message.id);
+  }
   var doc = self.docs[message.id];
 
   self._saveOriginal(message.id, doc);
@@ -589,6 +601,7 @@ LocalCollection.prototype._applyChanged = function (message) {
 // XXX findandmodify
 
 LocalCollection._deepcopy = function (v) {
+  var ret;
   if (typeof v !== "object")
     return v;
   if (v === null)
@@ -596,12 +609,17 @@ LocalCollection._deepcopy = function (v) {
   if (v instanceof Date)
     return new Date(v.getTime());
   if (_.isArray(v)) {
-    var ret = v.slice(0);
+    ret = v.slice(0);
     for (var i = 0; i < v.length; i++)
       ret[i] = LocalCollection._deepcopy(ret[i]);
     return ret;
   }
-  var ret = {};
+  // handle general user-defined typed Objects if they have a clone method
+  if (typeof v.clone === 'function') {
+    return v.clone();
+  }
+  // handle other objects
+  ret = {};
   for (var key in v)
     ret[key] = LocalCollection._deepcopy(v[key]);
   return ret;
@@ -625,7 +643,8 @@ LocalCollection._insertInResults = function (query, doc) {
     }
   } else {
     query.added(LocalCollection._deepcopy(doc));
-    query.results[doc._id] = LocalCollection._deepcopy(doc);
+    query.results[LocalCollection._idStringify(doc._id)] =
+      LocalCollection._deepcopy(doc);
   }
 };
 
@@ -635,19 +654,20 @@ LocalCollection._removeFromResults = function (query, doc) {
     query.removed(doc, i);
     query.results.splice(i, 1);
   } else {
-    var id = doc._id;  // in case callback mutates doc
+    var id = LocalCollection._idStringify(doc._id);  // in case callback mutates doc
     query.removed(doc);
     delete query.results[id];
   }
 };
 
 LocalCollection._updateInResults = function (query, doc, old_doc) {
-  if (doc._id !== old_doc._id)
+  if (!_.isEqual(doc._id, old_doc._id))
     throw new Error("Can't change a doc's _id while updating");
 
   if (!query.ordered) {
     query.changed(LocalCollection._deepcopy(doc), old_doc);
-    query.results[doc._id] = LocalCollection._deepcopy(doc);
+    query.results[LocalCollection._idStringify(doc._id)] =
+      LocalCollection._deepcopy(doc);
     return;
   }
 
@@ -691,7 +711,7 @@ LocalCollection._findInOrderedResults = function (query, doc) {
   if (!query.ordered)
     throw new Error("Can't call _findInOrderedResults on unordered query");
   for (var i = 0; i < query.results.length; i++)
-    if (query.results[i]._id === doc._id)
+    if (_.isEqual(query.results[i]._id, doc._id))
       return i;
   throw Error("object missing from query");
 };
@@ -789,3 +809,52 @@ LocalCollection.prototype.resumeObservers = function () {
     query.results_snapshot = null;
   }
 };
+
+
+LocalCollection._idStringify = function (id) {
+  if (id instanceof LocalCollection._findObjectIDClass()) {
+    return id.valueOf();
+  } else if (typeof id === 'string') {
+    if (id === "") {
+      return id;
+    } else if (id.substr(0, 1) === "-" || // escape previously dashed strings
+               id.substr(0, 1) === "~" || // escape escaped numbers, true, false
+               LocalCollection._looksLikeObjectID(id) || // escape object-id-form strings
+               id.substr(0, 1) === '{') { // escape object-form strings, for maybe implementing later
+      return "-" + id;
+    } else {
+      return id; // other strings go through unchanged.
+    }
+  } else if (id === undefined) {
+    return '-';
+  } else if (typeof id === 'object') {
+    throw new Error("Meteor does not currently support objects other than ObjectID as ids");
+  } else { // Numbers, true, false, null
+    return "~" + JSON.stringify(id);
+  }
+};
+
+
+
+LocalCollection._idParse = function (id) {
+  if (id === "") {
+    return id;
+  } else if (id === '-') {
+    return undefined;
+  } else if (id.substr(0, 1) === '-') {
+    return id.substr(1);
+  } else if (id.substr(0, 1) === '~') {
+    return JSON.parse(id.substr(1));
+  } else if (LocalCollection._looksLikeObjectID(id)) {
+    return new (LocalCollection._findObjectIDClass())(id);
+  } else {
+    return id;
+  }
+};
+
+if (typeof Meteor !== 'undefined') {
+  Meteor.idParse = LocalCollection._idParse;
+  Meteor.idStringify = LocalCollection._idStringify;
+}
+
+})();

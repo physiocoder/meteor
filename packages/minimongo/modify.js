@@ -252,8 +252,9 @@ LocalCollection._computeChange = function (doc, mod) {
   var newDoc;
 
   if (!isModifier) {
-    if (mod._id && doc._id !== mod._id)
+    if (mod._id && !_.isEqual(doc._id, mod._id)) {
       throw Error("Cannot change the _id of a document");
+    }
 
     newDoc = {};
 
@@ -290,7 +291,7 @@ LocalCollection._computeChange = function (doc, mod) {
     });
   }
 
-  var message = {msg: 'changed', id: doc._id};
+  var message = {msg: 'changed', id: LocalCollection._idStringify(doc._id)};
   var changeFields = {};
 
   LocalCollection._diffObjects(doc, newDoc, {

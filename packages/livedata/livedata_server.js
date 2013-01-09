@@ -171,7 +171,8 @@ _.extend(Meteor._SessionCollectionView.prototype, {
     var self = this;
     var docView = self.documents[id];
     if (!docView) {
-      throw new Error("Removed nonexistent document " + id);
+      var err = new Error("Removed nonexistent document " + id);
+      throw err;
     }
     delete docView.existsIn[subscriptionId];
     if (_.isEmpty(docView.existsIn)) {
@@ -255,24 +256,16 @@ _.extend(Meteor._LivedataSession.prototype, {
 
   sendChanged: function (collectionName, id, fields) {
     var self = this;
-    var cleared = [];
-    var messageFields = {};
     if (_.isEmpty(fields))
       return;
-    // convert internal format (undefined is clear) to wire format (list of clear)
-    _.each(fields, function (value, key) {
-      if (value === undefined)
-        cleared.push(key);
-      else
-        messageFields[key] = value;
-    });
+
     if (self._isSending) {
-      var toSend = {msg: "changed", collection: collectionName, id: id};
-      if (!_.isEmpty(messageFields))
-        toSend.fields = messageFields;
-      if (!_.isEmpty(cleared))
-        toSend.cleared = cleared;
-      self.send(toSend);
+      self.send({
+        msg: "changed",
+        collection: collectionName,
+        id: id,
+        fields: fields
+      });
     }
   },
 
@@ -334,7 +327,7 @@ _.extend(Meteor._LivedataSession.prototype, {
     self.socket = socket;
     self.last_connect_time = +(new Date);
     _.each(self.out_queue, function (msg) {
-      self.socket.send(JSON.stringify(msg));
+      self.socket.send(Meteor._stringifyDDP(msg));
     });
     self.out_queue = [];
 
@@ -343,7 +336,7 @@ _.extend(Meteor._LivedataSession.prototype, {
       self.initialized = true;
       Fiber(function () {
         _.each(self.server.universal_publish_handlers, function (handler) {
-          self._startSubscription(handler, self.next_sub_priority--);
+          self._startSubscription(handler);
         });
       }).run();
     }
@@ -405,7 +398,7 @@ _.extend(Meteor._LivedataSession.prototype, {
   send: function (msg) {
     var self = this;
     if (self.socket)
-      self.socket.send(JSON.stringify(msg));
+      self.socket.send(Meteor._stringifyDDP(msg));
     else
       self.out_queue.push(msg);
   },
@@ -498,7 +491,7 @@ _.extend(Meteor._LivedataSession.prototype, {
         return;
 
       var handler = self.server.publish_handlers[msg.name];
-      self._startSubscription(handler, self.next_sub_priority--,
+      self._startSubscription(handler,
                               msg.id, msg.params);
     },
 
@@ -662,10 +655,10 @@ _.extend(Meteor._LivedataSession.prototype, {
     // should make it automatic.
   },
 
-  _startSubscription: function (handler, priority, sub_id, params) {
+  _startSubscription: function (handler, sub_id, params) {
     var self = this;
 
-    var sub = new Meteor._LivedataSubscription(self, sub_id, priority);
+    var sub = new Meteor._LivedataSubscription(self, sub_id);
     if (sub_id)
       self.named_subs[sub_id] = sub;
     else
@@ -736,7 +729,7 @@ _.extend(Meteor._LivedataSession.prototype, {
 /******************************************************************************/
 
 // ctor for a sub handle: the input to each publish function
-Meteor._LivedataSubscription = function (session, subscriptionId, priority) {
+Meteor._LivedataSubscription = function (session, subscriptionId) {
   var self = this;
   // LivedataSession
   self._session = session;
@@ -760,6 +753,20 @@ Meteor._LivedataSubscription = function (session, subscriptionId, priority) {
 
   // Part of the public API: the user of this sub.
   self.userId = session.userId;
+
+  // For now, the id filter is going to default to
+  // the to/from DDP methods on LocalCollection, to
+  // specifically deal with mongo/minimongo ObjectIds.
+
+  // Later, you will be able to make this be "raw"
+  // if you want to publish a collection that you know
+  // just has strings for keys and no funny business, to
+  // a ddp consumer that isn't minimongo
+
+  self._idFilter = {
+    idStringify: Meteor.idStringify,
+    idParse: Meteor.idParse
+  };
 };
 
 _.extend(Meteor._LivedataSubscription.prototype, {
@@ -789,17 +796,20 @@ _.extend(Meteor._LivedataSubscription.prototype, {
 
   added: function (collectionName, id, fields) {
     var self = this;
+    id = self._idFilter.idStringify(id);
     Meteor._ensure(self._documents, collectionName)[id] = true;
     self._session.added(self._subscriptionId, collectionName, id, fields);
   },
 
   changed: function (collectionName, id, fields) {
     var self = this;
+    id = self._idFilter.idStringify(id);
     self._session.changed(self._subscriptionId, collectionName, id, fields);
   },
 
   removed: function (collectionName, id) {
     var self = this;
+    id = self._idFilter.idStringify(id);
     // We don't bother to delete sets of things in a collection if the
     // collection is empty.  It could break _removeAllDocuments.
     delete self._documents[collectionName][id];
@@ -829,8 +839,8 @@ _.extend(Meteor._LivedataSubscription.prototype, {
     _.each(self._documents, function(collectionDocs, collectionName) {
       // Iterate over _.keys instead of the dictionary itself, since we'll be
       // mutating it.
-      _.each(_.keys(collectionDocs), function (id) {
-        self.removed(collectionName, id);
+      _.each(_.keys(collectionDocs), function (strId) {
+        self.removed(collectionName, self._idFilter.idParse(strId));
       });
     });
   }
@@ -865,13 +875,13 @@ Meteor._LivedataServer = function () {
       var msg = {msg: 'error', reason: reason};
       if (offending_message)
         msg.offending_message = offending_message;
-      socket.send(JSON.stringify(msg));
+      socket.send(Meteor._stringifyDDP(msg));
     };
 
     socket.on('data', function (raw_msg) {
       try {
         try {
-          var msg = JSON.parse(raw_msg);
+          var msg = Meteor._parseDDP(raw_msg);
         } catch (err) {
           sendError('Parse error');
           return;
@@ -945,12 +955,12 @@ _.extend(Meteor._LivedataServer.prototype, {
       self.sessions[socket.meteor_session.id] = socket.meteor_session;
 
 
-      socket.send(JSON.stringify({msg: 'connected',
+      socket.send(Meteor._stringifyDDP({msg: 'connected',
                                   session: socket.meteor_session.id}));
       // will kick off previous connection, if any
       socket.meteor_session.connect(socket);
     } else {
-      socket.send(JSON.stringify({msg: 'failed', version: version}));
+      socket.send(Meteor._stringifyDDP({msg: 'failed', version: version}));
       socket.close();
     }
   },

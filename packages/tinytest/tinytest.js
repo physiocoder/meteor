@@ -117,13 +117,11 @@ _.extend(TestCaseResults.prototype, {
       actual = "[Unknown]";
     } else {
       matched = _.isEqual(expected, actual);
-      expected = JSON.stringify(expected);
-      actual = JSON.stringify(actual);
     }
 
     if (matched === !!not) {
       this.fail({type: "assert_equal", message: message,
-                 expected: expected, actual: actual, not: !!not});
+                 expected: JSON.stringify(expected), actual: JSON.stringify(actual), not: !!not});
     } else
       this.ok();
   },
@@ -209,7 +207,7 @@ _.extend(TestCaseResults.prototype, {
   include: function (s, v) {
     var pass = false;
     if (s instanceof Array)
-      pass = _.indexOf(s, v) !== -1;
+      pass = _.any(s, function(it) {return _.isEqual(v, it);});
     else if (typeof s === "object")
       pass = v in s;
     else if (typeof s === "string")
@@ -222,8 +220,9 @@ _.extend(TestCaseResults.prototype, {
       /* fail -- not something that contains other things */;
     if (pass)
       this.ok();
-    else
+    else {
       this.fail({type: "include", sequence: s, should_contain_value: v});
+    }
   },
 
   // XXX should change to lengthOf to match vowsjs
