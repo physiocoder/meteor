@@ -35,15 +35,15 @@ var SingleIdChangeObserver = function (cursor, id, ordered, callbacks) {
   }
 
   self._listenOnId();
-  self._batchListener = cursor.collection._bus.listen({msg: 'batch'}, function (message) {
-    if (message.atomic) {
-      self._storedObservedFields = LocalCollection._deepcopy(self.observedFields);
-    } else if (message.action === "end" && self._storedObservedFields !== undefined) {
-      self._sendDifferences();
-      self._storedObservedFields = undefined;
-    }
+  self._enterAtomicListener = cursor.collection._bus.onEnterAtomic(function () {
+    self._storedObservedFields = LocalCollection._deepcopy(self.observedFields);
   });
-
+  self._leaveAtomicListener = cursor.collection._bus.onLeaveAtomic(function () {
+    if (self._storedObservedFields === undefined)
+      throw new Error("Leave atomic without enter atomic!");
+    self._sendDifferences();
+    self._storedObservedFields = undefined;
+  });
 };
 
 
@@ -113,7 +113,8 @@ SingleIdChangeObserver.prototype._handleAdded = function (fields) {
 SingleIdChangeObserver.prototype.stop = function () {
   var self = this;
   self._idListener.stop();
-  self._batchListener.stop();
+  self._enterAtomicListener.stop();
+  self._leaveAtomicListener.stop();
 };
 
 

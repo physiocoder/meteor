@@ -37,7 +37,7 @@ LocalCollection = function (name, bus) {
   // they are connected to, so we don't save the handles here and never call
   // stop on them.
   self._listenWithCollection({}, _.bind(self._applyMessage, self));
-  self._bus.listen({msg: 'done'}, function () {
+  self._bus.onLeaveAllBatches(function () {
     _.each(self.queries, function(query) {
       if (query.needsRecompute) {
         LocalCollection._recomputeResults(query);
@@ -493,12 +493,13 @@ LocalCollection.prototype._applyMessages = function (messages) {
   var self = this;
   if (_.isEmpty(messages))
     return;
+  var batch = self._bus.startBatch();
   _.each(messages, function (message) {
     if (self._name)
       message.collection = self._name;
     self._bus.fire(message);
   });
-  self._bus.fire({msg: 'done'});
+  batch.endBatch();
 };
 
 LocalCollection.prototype._applyMessage = function (message) {

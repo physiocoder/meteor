@@ -12,6 +12,12 @@ LocalCollection._MessageBus = function () {
   self._collectionSpecificListeners = {};
   // map from listener id to listener.
   self._nonCollectionListeners = {};
+  self._onEnterAtomicCallbacks = {};
+  self._onLeaveAtomicCallbacks = {};
+  self._onLeaveAllBatchesCallbacks = {};
+
+  self._batchDepth = 0;
+  self._atomicBatchDepth = 0;
 };
 
 _.extend(LocalCollection._MessageBus.prototype, {
@@ -81,5 +87,55 @@ _.extend(LocalCollection._MessageBus.prototype, {
       if (!_.isEqual(trigger[key], notification[key]))
         return false;
     return true;
+  },
+
+  startBatch: function (atomic) {
+    var self = this;
+    self._batchDepth++;
+    if (atomic) {
+      self._atomicBatchDepth++;
+      if (self._atomicBatchDepth === 1)
+        self._runCallbacks(self._onEnterAtomicCallbacks);
+    }
+    return { endBatch: function () {
+      self._batchDepth--;
+      if (atomic) {
+        self._atomicBatchDepth--;
+        if (self._atomicBatchDepth === 0)
+          self._runCallbacks(self._onLeaveAtomicCallbacks);
+      }
+      if (self._batchDepth === 0) {
+        self._runCallbacks(self._onLeaveAllBatchesCallbacks);
+      }
+    } };
+  },
+
+  _addCallback: function (callback, registry) {
+    var self = this;
+    var id = self._nextId++;
+    registry[id] = callback;
+    return { stop: function () { delete registry[id]; } };
+  },
+
+  _runCallbacks: function (registry) {
+    var self = this;
+    _.each(registry, function (callback) {
+      callback();
+    });
+  },
+
+  onEnterAtomic: function (callback) {
+    var self = this;
+    return self._addCallback(callback, self._onEnterAtomicCallbacks);
+  },
+
+  onLeaveAtomic: function (callback) {
+    var self = this;
+    return self._addCallback(callback, self._onLeaveAtomicCallbacks);
+  },
+
+  onLeaveAllBatches: function (callback) {
+    var self = this;
+    return self._addCallback(callback, self._onLeaveAllBatchesCallbacks);
   }
 });
