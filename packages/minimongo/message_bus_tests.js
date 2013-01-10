@@ -61,3 +61,62 @@ Tinytest.add("minimongo - message bus", function (test) {
             fromBoth: 15});
   test.length(results, 0);
 });
+
+Tinytest.add("minimongo - message bus batches", function (test) {
+  var bus = new LocalCollection._MessageBus;
+
+  // enterAtomic, leaveAtomic, leaveAllBatches
+  var callbackInvocations = [0, 0, 0];
+
+  var enterAtomicHandle = bus.onEnterAtomic(function () {
+    callbackInvocations[0]++;
+  });
+  var leaveAtomicHandle = bus.onLeaveAtomic(function () {
+    callbackInvocations[1]++;
+  });
+  var leaveAllHandle = bus.onLeaveAllBatches(function () {
+    callbackInvocations[2]++;
+  });
+
+  test.equal(callbackInvocations, [0, 0, 0]);
+
+  var firstBatch = bus.startBatch();
+  test.equal(callbackInvocations, [0, 0, 0]);
+
+  var secondBatch = bus.startBatch();
+  test.equal(callbackInvocations, [0, 0, 0]);
+
+  var firstAtomic = bus.startBatch(true);
+  test.equal(callbackInvocations, [1, 0, 0]);
+
+  var secondAtomic = bus.startBatch(true);
+  test.equal(callbackInvocations, [1, 0, 0]);
+  secondAtomic.endBatch();
+  test.equal(callbackInvocations, [1, 0, 0]);
+
+  var thirdAtomic = bus.startBatch(true);
+  test.equal(callbackInvocations, [1, 0, 0]);
+  thirdAtomic.endBatch();
+  test.equal(callbackInvocations, [1, 0, 0]);
+
+  firstAtomic.endBatch();
+  test.equal(callbackInvocations, [1, 1, 0]);
+
+  secondBatch.endBatch();
+  test.equal(callbackInvocations, [1, 1, 0]);
+
+  firstBatch.endBatch();
+  test.equal(callbackInvocations, [1, 1, 1]);
+
+  var anotherAtomic = bus.startBatch(true);
+  test.equal(callbackInvocations, [2, 1, 1]);
+
+  leaveAtomicHandle.stop();
+  anotherAtomic.endBatch();
+  // Because we stopped the leaveAtomicHandle, the second number isn't
+  // incremented.
+  test.equal(callbackInvocations, [2, 1, 2]);
+
+  enterAtomicHandle.stop();
+  leaveAllHandle.stop();
+});

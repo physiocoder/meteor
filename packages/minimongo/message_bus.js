@@ -99,14 +99,20 @@ _.extend(LocalCollection._MessageBus.prototype, {
     }
     return { endBatch: function () {
       self._batchDepth--;
-      if (atomic) {
+      if (atomic)
         self._atomicBatchDepth--;
-        if (self._atomicBatchDepth === 0)
-          self._runCallbacks(self._onLeaveAtomicCallbacks);
-      }
-      if (self._batchDepth === 0) {
+
+      if (self._batchDepth < 0)
+        throw new Error("end batch without start!");
+      if (self._atomicDepth < 0)
+        throw new Error("end atomic without start!");
+      if (self._atomicDepth > self._batchDepth)
+        throw new Error("more atomic batches than batches!");
+
+      if (atomic && self._atomicBatchDepth === 0)
+        self._runCallbacks(self._onLeaveAtomicCallbacks);
+      if (self._batchDepth === 0)
         self._runCallbacks(self._onLeaveAllBatchesCallbacks);
-      }
     } };
   },
 
