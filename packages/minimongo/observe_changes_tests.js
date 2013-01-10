@@ -37,14 +37,15 @@ _.each (['added', 'addedBefore'], function (added) {
     var logger = new CallbackLogger(test, [added, "changed"]);
     c.find("foo", {fields: {bacon: 0}}).observeChanges(logger);
     logger.expectNoResult();
-    c.insert({_id: "foo", noodles: "good", bacon: "bad", apples: "ok"});
+    c.insert({_id: "foo", noodles: "good", bacon: "bad", disappear: 42, apples: "ok"});
     if (added === 'added')
-      logger.expectResult(added, ["foo", {noodles: "good", apples: "ok"}]);
+      logger.expectResult(added, ["foo", {noodles: "good", disappear: 42, apples: "ok"}]);
     else
-      logger.expectResult(added, ["foo", {noodles: "good", apples: "ok"}, null]);
+      logger.expectResult(added, ["foo", {noodles: "good", disappear: 42, apples: "ok"}, null]);
     logger.expectNoResult();
     c.update("foo", {noodles: "alright", potatoes: "tasty", apples: "ok"});
-    logger.expectResult("changed", ["foo", {noodles: "alright", potatoes: "tasty"}]);
+    logger.expectResult(
+      "changed", ["foo", {noodles: "alright", potatoes: "tasty", disappear: undefined}]);
     logger.expectNoResult();
     c.remove("foo");
     // we don't have a removed callback here

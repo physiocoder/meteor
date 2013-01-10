@@ -1,15 +1,11 @@
 (function () {
 
-var filterFields = function (fields, cleared, includeField) {
+var filterFields = function (fields, includeField) {
   var result = {};
 
   _.each(fields, function (value, key) {
     if (key !== '_id' && includeField(key))
       result[key] = value;
-  });
-  _.each(cleared, function (clearKey) {
-    if (clearKey !== '_id' && includeField(clearKey))
-      result[clearKey] = undefined;
   });
   if (_.isEmpty(result))
     return null;
@@ -38,7 +34,7 @@ var SingleIdChangeObserver = function (cursor, id, ordered, callbacks) {
     self._handleAdded(cursor.collection.docs[id]);
   }
 
-  self._registerHandle();
+  self._listenOnId();
   self._batchListener = cursor.collection._bus.listen({msg: 'batch'}, function (message) {
     if (message.atomic) {
       self._storedObservedFields = LocalCollection._deepcopy(self.observedFields);
@@ -81,9 +77,9 @@ SingleIdChangeObserver.prototype._sendDifferences = function () {
   self._callbacks.changed(self._id, changeFields);
 };
 
-SingleIdChangeObserver.prototype._registerHandle = function () {
+SingleIdChangeObserver.prototype._listenOnId = function () {
   var self = this;
-  self._stopHandle = self._cursor.collection._listenWithCollection({id: self._id}, function (message) {
+  self._idListener = self._cursor.collection._listenWithCollection({id: self._id}, function (message) {
     if (self._id !== message.id)
       throw new Error("Got a message not intended for this id");
     switch (message.msg) {
@@ -91,7 +87,7 @@ SingleIdChangeObserver.prototype._registerHandle = function () {
       self._handleAdded(message.fields);
       return;
     case "changed":
-      var changedFields = filterFields(message.fields, message.cleared, self._cursor._includeField);
+      var changedFields = filterFields(message.fields, self._cursor._includeField);
       if (changedFields) {
         applyObserveChanges(self._observedFields, changedFields);
         self._callbacks.changed && self._callbacks.changed(self._id, changedFields);
@@ -107,7 +103,7 @@ SingleIdChangeObserver.prototype._registerHandle = function () {
 
 SingleIdChangeObserver.prototype._handleAdded = function (fields) {
   var self = this;
-  self._observedFields = filterFields(fields, null, self._cursor._includeField);
+  self._observedFields = filterFields(fields, self._cursor._includeField);
   if (self._ordered)
     self._callbacks.addedBefore && self._callbacks.addedBefore(self._id, self._observedFields, null);
   else
@@ -116,8 +112,13 @@ SingleIdChangeObserver.prototype._handleAdded = function (fields) {
 
 SingleIdChangeObserver.prototype.stop = function () {
   var self = this;
-  self._stopHandle.stop();
+  self._idListener.stop();
+  self._batchListener.stop();
 };
+
+
+
+
 
 // callbacks is an object of the form:
 // { added, changed, removed }
