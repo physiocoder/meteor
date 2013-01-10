@@ -8,8 +8,8 @@
 
 Meteor._SessionDocumentView = function () {
   var self = this;
-  self.existsIn = {}; // set of subId
-  self.dataByKey = {}; // key-> [ {subscriptionId, value} by precedence]
+  self.existsIn = {}; // set of subscriptionHandle
+  self.dataByKey = {}; // key-> [ {subscriptionHandle, value} by precedence]
 };
 
 _.extend(Meteor._SessionDocumentView.prototype, {
@@ -23,7 +23,7 @@ _.extend(Meteor._SessionDocumentView.prototype, {
     return ret;
   },
 
-  clearField: function (subscriptionId, key, changeCollector) {
+  clearField: function (subscriptionHandle, key, changeCollector) {
     var self = this;
     // Publish API ignores _id if present in fields
     if (key === "_id")
@@ -35,7 +35,7 @@ _.extend(Meteor._SessionDocumentView.prototype, {
     var removedValue = undefined;
     for (var i = 0; i < precedenceList.length; i++) {
       var precedence = precedenceList[i];
-      if (precedence.subscriptionId === subscriptionId) {
+      if (precedence.subscriptionHandle === subscriptionHandle) {
         // The view's value can only change if this subscription is the one that
         // used to have precedence.
         if (i === 0)
@@ -53,13 +53,15 @@ _.extend(Meteor._SessionDocumentView.prototype, {
     }
   },
 
-  changeField: function (subscriptionId, key, value, changeCollector, isAdd) {
+  changeField: function (subscriptionHandle, key, value,
+                         changeCollector, isAdd) {
     var self = this;
     // Publish API ignores _id if present in fields
     if (key === "_id")
       return;
     if (!_.has(self.dataByKey, key)) {
-      self.dataByKey[key] = [{subscriptionId: subscriptionId, value: value}];
+      self.dataByKey[key] = [{subscriptionHandle: subscriptionHandle,
+                              value: value}];
       changeCollector[key] = value;
       return;
     }
@@ -67,7 +69,7 @@ _.extend(Meteor._SessionDocumentView.prototype, {
     var elt;
     if (!isAdd) {
       elt = _.find(precedenceList, function (precedence) {
-        return precedence.subscriptionId === subscriptionId;
+        return precedence.subscriptionHandle === subscriptionHandle;
       });
     }
 
@@ -79,7 +81,7 @@ _.extend(Meteor._SessionDocumentView.prototype, {
       elt.value = value;
     } else {
       // this subscription is newly caring about this field
-      precedenceList.push({subscriptionId: subscriptionId, value: value});
+      precedenceList.push({subscriptionHandle: subscriptionHandle, value: value});
     }
 
   }
@@ -132,7 +134,7 @@ _.extend(Meteor._SessionCollectionView.prototype, {
     self.callbacks.changed(self.collectionName, id, fields);
   },
 
-  added: function (subscriptionId, id, fields) {
+  added: function (subscriptionHandle, id, fields) {
     var self = this;
     var docView = self.documents[id];
     var added = false;
@@ -141,10 +143,11 @@ _.extend(Meteor._SessionCollectionView.prototype, {
       docView = new Meteor._SessionDocumentView();
       self.documents[id] = docView;
     }
-    docView.existsIn[subscriptionId] = true;
+    docView.existsIn[subscriptionHandle] = true;
     var changeCollector = {};
     _.each(fields, function (value, key) {
-      docView.changeField(subscriptionId, key, value, changeCollector, true);
+      docView.changeField(
+        subscriptionHandle, key, value, changeCollector, true);
     });
     if (added)
       self.callbacks.added(self.collectionName, id, changeCollector);
@@ -152,7 +155,7 @@ _.extend(Meteor._SessionCollectionView.prototype, {
       self.callbacks.changed(self.collectionName, id, changeCollector);
   },
 
-  changed: function (subscriptionId, id, changed) {
+  changed: function (subscriptionHandle, id, changed) {
     var self = this;
     var changedResult = {};
     var docView = self.documents[id];
@@ -160,21 +163,21 @@ _.extend(Meteor._SessionCollectionView.prototype, {
       throw new Error("Could not find element with id " + id + " to change");
     _.each(changed, function (value, key) {
       if (value === undefined)
-        docView.clearField(subscriptionId, key, changedResult);
+        docView.clearField(subscriptionHandle, key, changedResult);
       else
-        docView.changeField(subscriptionId, key, value, changedResult);
+        docView.changeField(subscriptionHandle, key, value, changedResult);
     });
     self.callbacks.changed(self.collectionName, id, changedResult);
   },
 
-  removed: function (subscriptionId, id) {
+  removed: function (subscriptionHandle, id) {
     var self = this;
     var docView = self.documents[id];
     if (!docView) {
       var err = new Error("Removed nonexistent document " + id);
       throw err;
     }
-    delete docView.existsIn[subscriptionId];
+    delete docView.existsIn[subscriptionHandle];
     if (_.isEmpty(docView.existsIn)) {
       // it is gone from everyone
       self.callbacks.removed(self.collectionName, id);
@@ -184,7 +187,7 @@ _.extend(Meteor._SessionCollectionView.prototype, {
       // remove this subscription from every precedence list
       // and record the changes
       _.each(docView.dataByKey, function (precedenceList, key) {
-        docView.clearField(subscriptionId, key, changed);
+        docView.clearField(subscriptionHandle, key, changed);
       });
 
       self.callbacks.changed(self.collectionName, id, changed);
@@ -295,25 +298,25 @@ _.extend(Meteor._LivedataSession.prototype, {
     return ret;
   },
 
-  added: function (subscriptionId, collectionName, id, fields) {
+  added: function (subscriptionHandle, collectionName, id, fields) {
     var self = this;
     var view = self.getCollectionView(collectionName);
-    view.added(subscriptionId, id, fields);
+    view.added(subscriptionHandle, id, fields);
   },
 
-  removed: function (subscriptionId, collectionName, id) {
+  removed: function (subscriptionHandle, collectionName, id) {
     var self = this;
     var view = self.getCollectionView(collectionName);
-    view.removed(subscriptionId, id);
+    view.removed(subscriptionHandle, id);
     if (view.isEmpty()) {
       delete self.collectionViews[collectionName];
     }
   },
 
-  changed: function (subscriptionId, collectionName, id, fields) {
+  changed: function (subscriptionHandle, collectionName, id, fields) {
     var self = this;
     var view = self.getCollectionView(collectionName);
-    view.changed(subscriptionId, id, fields);
+    view.changed(subscriptionHandle, id, fields);
   },
   // Connect a new socket to this session, displacing (and closing)
   // any socket that was previously connected
@@ -734,8 +737,17 @@ Meteor._LivedataSubscription = function (session, subscriptionId) {
   // LivedataSession
   self._session = session;
 
-  // my subscription ID (generated by client, null for universal subs).
+  // my subscription ID (generated by client, undefined for universal subs).
   self._subscriptionId = subscriptionId;
+
+  // Only named subscriptions have IDs, but we need some sort of string
+  // internally to keep track of all subscriptions inside
+  // SessionDocumentViews. We use this subscriptionHandle for that.
+  if (self._subscriptionId) {
+    self._subscriptionHandle = 'N' + self._subscriptionId;
+  } else {
+    self._subscriptionHandle = 'U' + Meteor.id();
+  }
 
   // has stop() been called?
   self._stopped = false;
@@ -798,13 +810,13 @@ _.extend(Meteor._LivedataSubscription.prototype, {
     var self = this;
     id = self._idFilter.idStringify(id);
     Meteor._ensure(self._documents, collectionName)[id] = true;
-    self._session.added(self._subscriptionId, collectionName, id, fields);
+    self._session.added(self._subscriptionHandle, collectionName, id, fields);
   },
 
   changed: function (collectionName, id, fields) {
     var self = this;
     id = self._idFilter.idStringify(id);
-    self._session.changed(self._subscriptionId, collectionName, id, fields);
+    self._session.changed(self._subscriptionHandle, collectionName, id, fields);
   },
 
   removed: function (collectionName, id) {
@@ -813,11 +825,13 @@ _.extend(Meteor._LivedataSubscription.prototype, {
     // We don't bother to delete sets of things in a collection if the
     // collection is empty.  It could break _removeAllDocuments.
     delete self._documents[collectionName][id];
-    self._session.removed(self._subscriptionId, collectionName, id);
+    self._session.removed(self._subscriptionHandle, collectionName, id);
   },
 
   complete: function () {
     var self = this;
+    if (!self._subscriptionId)
+      throw new Error("Can't complete a universal subscription");
     if (!self._complete) {
       self._session.sendComplete([self._subscriptionId]);
       self._complete = true;
