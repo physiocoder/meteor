@@ -26,7 +26,7 @@ var SingleIdChangeObserver = function (cursor, id, ordered, callbacks) {
   var self = this;
   self._callbacks = callbacks;
   self._observedFields = null;
-  self._storedObservedFields = undefined;
+  self._atomicBatchState = null;
   self._id = id;
   self._ordered = ordered;
   self._cursor = cursor;
@@ -34,24 +34,16 @@ var SingleIdChangeObserver = function (cursor, id, ordered, callbacks) {
     self._handleAdded(cursor.collection.docs[id]);
   }
 
-  self._listenOnId();
-  self._enterAtomicListener = cursor.collection._bus.onEnterAtomic(function () {
-    self._storedObservedFields = LocalCollection._deepcopy(self.observedFields);
-  });
-  self._leaveAtomicListener = cursor.collection._bus.onLeaveAtomic(function () {
-    if (self._storedObservedFields === undefined)
-      throw new Error("Leave atomic without enter atomic!");
-    self._sendDifferences();
-    self._storedObservedFields = undefined;
-  });
+  self._listenForId();
+  self._listenForBatches();
 };
 
 
-SingleIdChangeObserver.prototype._sendDifferences = function () {
+SingleIdChangeObserver.prototype._sendAtomicBatchDifferences = function () {
   var self = this;
-  if (self._storedObservedFields === null && self._observedFields === null)
+  if (self._atomicBatchState.fields === null && self._observedFields === null)
     return;
-  if (self._storedObservedFields === null) {
+  if (self._atomicBatchState.fields === null) {
     self._handleAdded(self._observedFields);
     return;
   }
@@ -60,7 +52,8 @@ SingleIdChangeObserver.prototype._sendDifferences = function () {
     return;
   }
   var changeFields = {};
-  LocalCollection._diffObjects(self._storedObservedFields, self._observedFields, {
+  LocalCollection._diffObjects(
+    self._atomicBatchState.fields, self._observedFields, {
     leftOnly: function (key, leftValue) {
       if (key !== '_id')
         changeFields[key] = undefined;
@@ -77,7 +70,7 @@ SingleIdChangeObserver.prototype._sendDifferences = function () {
   self._callbacks.changed(self._id, changeFields);
 };
 
-SingleIdChangeObserver.prototype._listenOnId = function () {
+SingleIdChangeObserver.prototype._listenForId = function () {
   var self = this;
   self._idListener = self._cursor.collection._listenWithCollection({id: self._id}, function (message) {
     if (self._id !== message.id)
@@ -98,6 +91,23 @@ SingleIdChangeObserver.prototype._listenOnId = function () {
       self._callbacks.removed && self._callbacks.removed(self._id);
       return;
     }
+  });
+};
+
+SingleIdChangeObserver.prototype._listenForBatches = function () {
+  var self = this;
+  self._enterAtomicListener = self._cursor.collection._bus.onEnterAtomic(function () {
+    self._atomicBatchState = {
+      fields: LocalCollection._deepcopy(self.observedFields),
+      modified: false
+    };
+  });
+  self._leaveAtomicListener = self._cursor.collection._bus.onLeaveAtomic(function () {
+    if (!self._atomicBatchState)
+      throw new Error("Leave atomic without enter atomic!");
+    if (self._atomicBatchState.modified)
+      self._sendAtomicBatchDifferences();
+    self._atomicBatchState = null;
   });
 };
 
