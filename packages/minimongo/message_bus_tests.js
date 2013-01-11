@@ -1,5 +1,6 @@
 Tinytest.add("minimongo - message bus", function (test) {
   var bus = new LocalCollection._MessageBus;
+  bus.startBatch();
 
   var results = [];
 

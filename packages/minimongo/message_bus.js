@@ -63,6 +63,10 @@ _.extend(LocalCollection._MessageBus.prototype, {
   // (registered with listen()).
   fire: function (notification) {
     var self = this;
+
+    if (self._batchDepth === 0)
+      throw new Error("Can't send a message outside of a batch");
+
     var callbacks = [];
 
     _.each(self._nonCollectionListeners, function (l) {
