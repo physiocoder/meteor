@@ -44,30 +44,32 @@ SingleIdChangeObserver.prototype._sendAtomicBatchDifferences = function () {
   if (self._atomicBatchState.fields === null && self._observedFields === null)
     return;
   if (self._atomicBatchState.fields === null) {
-    self._handleAdded(self._observedFields);
+    self._callAdded();
     return;
   }
-  if (self._observedFields == null) {
-    self._callbacks.removed(self._id);
+  if (self._observedFields === null) {
+    self._callbacks.removed && self._callbacks.removed(self._id);
     return;
   }
-  var changeFields = {};
-  LocalCollection._diffObjects(
-    self._atomicBatchState.fields, self._observedFields, {
-    leftOnly: function (key, leftValue) {
-      if (key !== '_id')
-        changeFields[key] = undefined;
-    },
-    rightOnly: function (key, rightValue) {
-      if (key !== '_id')
-        changeFields[key] = rightValue;
-    },
-    both: function (key, leftValue, rightValue) {
-      if (key !== '_id' && !LocalCollection._f._equal(leftValue, rightValue))
-        changeFields[key] = rightValue;
-    }
-  });
-  self._callbacks.changed(self._id, changeFields);
+  if (self._callbacks.changed) {
+    var changeFields = {};
+    LocalCollection._diffObjects(
+      self._atomicBatchState.fields, self._observedFields, {
+        leftOnly: function (key, leftValue) {
+          if (key !== '_id')
+            changeFields[key] = undefined;
+        },
+        rightOnly: function (key, rightValue) {
+          if (key !== '_id')
+            changeFields[key] = rightValue;
+        },
+        both: function (key, leftValue, rightValue) {
+          if (key !== '_id' && !LocalCollection._f._equal(leftValue, rightValue))
+            changeFields[key] = rightValue;
+        }
+      });
+    self._callbacks.changed(self._id, changeFields);
+  }
 };
 
 SingleIdChangeObserver.prototype._listenForId = function () {
@@ -83,12 +85,18 @@ SingleIdChangeObserver.prototype._listenForId = function () {
       var changedFields = filterFields(message.fields, self._cursor._includeField);
       if (changedFields) {
         applyObserveChanges(self._observedFields, changedFields);
-        self._callbacks.changed && self._callbacks.changed(self._id, changedFields);
+        if (self._atomicBatchState)
+          self._atomicBatchState.modified = true;
+        else
+          self._callbacks.changed && self._callbacks.changed(self._id, changedFields);
       }
       return;
     case "removed":
       self._observedFields = null;
-      self._callbacks.removed && self._callbacks.removed(self._id);
+      if (self._atomicBatchState)
+        self._atomicBatchState.modified = true;
+      else
+        self._callbacks.removed && self._callbacks.removed(self._id);
       return;
     }
   });
@@ -114,6 +122,15 @@ SingleIdChangeObserver.prototype._listenForBatches = function () {
 SingleIdChangeObserver.prototype._handleAdded = function (fields) {
   var self = this;
   self._observedFields = filterFields(fields, self._cursor._includeField);
+  if (self._atomicBatchState) {
+    self._atomicBatchState.modified = true;
+  } else {
+    self._callAdded();
+  }
+};
+
+SingleIdChangeObserver.prototype._callAdded = function () {
+  var self = this;
   if (self._ordered)
     self._callbacks.addedBefore && self._callbacks.addedBefore(self._id, self._observedFields, null);
   else
