@@ -44,21 +44,21 @@ var log_callbacks = function (operations) {
   return {
     added: function (obj, idx) {
       delete obj._id;
-      operations.push(LocalCollection._deepcopy(['added', obj, idx]));
+      operations.push(EJSON.clone(['added', obj, idx]));
     },
     changed: function (obj, at, old_obj) {
       delete obj._id;
       delete old_obj._id;
-      operations.push(LocalCollection._deepcopy(['changed', obj, at, old_obj]));
+      operations.push(EJSON.clone(['changed', obj, at, old_obj]));
     },
     moved: function (obj, old_at, new_at) {
       delete obj._id;
-      operations.push(LocalCollection._deepcopy(['moved', obj, old_at, new_at]));
+      operations.push(EJSON.clone(['moved', obj, old_at, new_at]));
     },
     removed: function (old_obj, at) {
       var id = old_obj._id;
       delete old_obj._id;
-      operations.push(LocalCollection._deepcopy(['removed', id, at, old_obj]));
+      operations.push(EJSON.clone(['removed', id, at, old_obj]));
     }
   };
 };
@@ -216,7 +216,7 @@ Tinytest.add("minimongo - misc", function (test) {
   // deepcopy
   var a = {a: [1, 2, 3], b: "x", c: true, d: {x: 12, y: [12]},
            f: null, g: new Date()};
-  var b = LocalCollection._deepcopy(a);
+  var b = EJSON.clone(a);
   // minimongo doesn't support Dates, so we *can't* test
   // LocalCollection._f._equal here! (Currently _equal considers all dates equal
   // on most browsers except IE7 where it considers all dates unequal.)
@@ -235,7 +235,7 @@ Tinytest.add("minimongo - misc", function (test) {
   test.notEqual(a.g, b.g);
 
   a = {x: function () {}};
-  b = LocalCollection._deepcopy(a);
+  b = EJSON.clone(a);
   a.x.a = 14;
   test.equal(b.x.a, 14); // just to document current behavior
 });
@@ -946,7 +946,7 @@ Tinytest.add("minimongo - subkey sort", function (test) {
 Tinytest.add("minimongo - modify", function (test) {
   var modify = function (doc, mod, result) {
     var message = LocalCollection._computeChange(doc, mod);
-    var actual = LocalCollection._deepcopy(doc);
+    var actual = EJSON.clone(doc);
     if (message) {
       LocalCollection._applyChanges(actual, message.fields);
     }

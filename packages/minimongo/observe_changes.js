@@ -106,7 +106,7 @@ SingleIdChangeObserver.prototype._listenForBatches = function () {
   var self = this;
   self._enterAtomicListener = self._cursor.collection._bus.onEnterAtomic(function () {
     self._atomicBatchState = {
-      fields: LocalCollection._deepcopy(self.observedFields),
+      fields: EJSON.clone(self.observedFields),
       modified: false
     };
   });

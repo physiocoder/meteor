@@ -76,7 +76,7 @@ LocalCollection._modifiers = {
     }
   },
   $set: function (target, field, arg) {
-    target[field] = LocalCollection._deepcopy(arg);
+    target[field] = EJSON.clone(arg);
   },
   $unset: function (target, field, arg) {
     if (target !== undefined) {
@@ -94,7 +94,7 @@ LocalCollection._modifiers = {
     else if (!(x instanceof Array))
       throw Error("Cannot apply $push modifier to non-array");
     else
-      x.push(LocalCollection._deepcopy(arg));
+      x.push(EJSON.clone(arg));
   },
   $pushAll: function (target, field, arg) {
     if (!(typeof arg === "object" && arg instanceof Array))
@@ -264,10 +264,10 @@ LocalCollection._computeChange = function (doc, mod) {
         throw Error("When replacing document, field name may not start with '$'");
       if (k.indexOf('.') !== -1)
         throw Error("When replacing document, field name may not contain '.'");
-      newDoc[k] = LocalCollection._deepcopy(v);
+      newDoc[k] = EJSON.clone(v);
     });
   } else {
-    newDoc = LocalCollection._deepcopy(doc);
+    newDoc = EJSON.clone(doc);
 
     _.each(mod, function (body, op) {
       if (!_.has(LocalCollection._modifiers, op))
