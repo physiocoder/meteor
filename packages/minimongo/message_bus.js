@@ -88,7 +88,7 @@ _.extend(LocalCollection._MessageBus.prototype, {
 
   _matches: function (notification, trigger) {
     for (var key in trigger)
-      if (!_.isEqual(trigger[key], notification[key]))
+      if (!EJSON.equals(trigger[key], notification[key]))
         return false;
     return true;
   },

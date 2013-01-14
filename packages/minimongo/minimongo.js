@@ -635,7 +635,7 @@ LocalCollection._removeFromResults = function (query, doc) {
 };
 
 LocalCollection._updateInResults = function (query, doc, old_doc) {
-  if (!_.isEqual(doc._id, old_doc._id))
+  if (!EJSON.equals(doc._id, old_doc._id))
     throw new Error("Can't change a doc's _id while updating");
 
   if (!query.ordered) {
@@ -685,7 +685,7 @@ LocalCollection._findInOrderedResults = function (query, doc) {
   if (!query.ordered)
     throw new Error("Can't call _findInOrderedResults on unordered query");
   for (var i = 0; i < query.results.length; i++)
-    if (_.isEqual(query.results[i]._id, doc._id))
+    if (EJSON.equals(query.results[i]._id, doc._id))
       return i;
   throw Error("object missing from query");
 };

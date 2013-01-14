@@ -252,7 +252,7 @@ LocalCollection._computeChange = function (doc, mod) {
   var newDoc;
 
   if (!isModifier) {
-    if (mod._id && !_.isEqual(doc._id, mod._id)) {
+    if (mod._id && !EJSON.equals(doc._id, mod._id)) {
       throw Error("Cannot change the _id of a document");
     }
 
