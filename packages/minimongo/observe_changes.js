@@ -13,7 +13,7 @@ var filterFields = function (fields, includeField) {
 };
 
 var applyObserveChanges = function (target, changes) {
-  _.each(changes, function (key, value) {
+  _.each(changes, function (value, key) {
     if (value === undefined)
       delete target[key];
     else
@@ -106,7 +106,7 @@ SingleIdChangeObserver.prototype._listenForBatches = function () {
   var self = this;
   self._enterAtomicListener = self._cursor.collection._bus.onEnterAtomic(function () {
     self._atomicBatchState = {
-      fields: EJSON.clone(self.observedFields),
+      fields: EJSON.clone(self._observedFields),
       modified: false
     };
   });
