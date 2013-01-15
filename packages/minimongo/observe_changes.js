@@ -1,5 +1,19 @@
 (function () {
 
+// Superclass functions.
+// XXX: figure out inheritance already?
+
+var callOrDefer = function (callback) {
+  var self = this;
+  var args = Array.prototype.slice.call(arguments, 1);
+  if (self._atomicBatchState)
+    self._atomicBatchState.modified = true;
+  else
+    callback && callback.apply(self, args);
+};
+
+// utility functions
+
 var filterFields = function (fields, includeField) {
   var result = {};
 
@@ -38,6 +52,7 @@ var SingleIdChangeObserver = function (cursor, id, ordered, callbacks) {
   self._listenForBatches();
 };
 
+SingleIdChangeObserver.prototype._callOrDefer = callOrDefer;
 
 SingleIdChangeObserver.prototype._sendAtomicBatchDifferences = function () {
   var self = this;
@@ -74,7 +89,8 @@ SingleIdChangeObserver.prototype._sendAtomicBatchDifferences = function () {
 
 SingleIdChangeObserver.prototype._listenForId = function () {
   var self = this;
-  self._idListener = self._cursor.collection._listenWithCollection({id: self._id}, function (message) {
+  self._idListener = self._cursor.collection._listenWithCollection({id: self._id},
+                                                                   function (message) {
     if (self._id !== message.id)
       throw new Error("Got a message not intended for this id");
     switch (message.msg) {
@@ -85,18 +101,12 @@ SingleIdChangeObserver.prototype._listenForId = function () {
       var changedFields = filterFields(message.fields, self._cursor._includeField);
       if (changedFields) {
         applyObserveChanges(self._observedFields, changedFields);
-        if (self._atomicBatchState)
-          self._atomicBatchState.modified = true;
-        else
-          self._callbacks.changed && self._callbacks.changed(self._id, changedFields);
+        self._callOrDefer(self._callbacks.changed, self._id, changedFields);
       }
       return;
     case "removed":
       self._observedFields = null;
-      if (self._atomicBatchState)
-        self._atomicBatchState.modified = true;
-      else
-        self._callbacks.removed && self._callbacks.removed(self._id);
+      self._callOrDefer(self._callbacks.removed, self._id);
       return;
     }
   });
@@ -122,11 +132,7 @@ SingleIdChangeObserver.prototype._listenForBatches = function () {
 SingleIdChangeObserver.prototype._handleAdded = function (fields) {
   var self = this;
   self._observedFields = filterFields(fields, self._cursor._includeField);
-  if (self._atomicBatchState) {
-    self._atomicBatchState.modified = true;
-  } else {
-    self._callAdded();
-  }
+  self._callOrDefer(self._callAdded);
 };
 
 SingleIdChangeObserver.prototype._callAdded = function () {
