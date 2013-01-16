@@ -438,7 +438,7 @@ if (Meteor.isClient) {
 // serialization / beginAsync(true) / beginAsync(false)
 // malformed messages (need raw wire access)
 // method completion/satisfaction
-// subscriptions (multiple APIs, including autosubscribe?)
+// subscriptions (multiple APIs, including autorun?)
 // subscription completion
 // subscription attribute shadowing
 // server method calling methods on other server (eg, should simulate)

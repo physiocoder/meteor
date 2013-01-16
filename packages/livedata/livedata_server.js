@@ -5,6 +5,7 @@
 
 (function () {
 
+var Fiber = __meteor_bootstrap__.require('fibers');
 
 Meteor._SessionDocumentView = function () {
   var self = this;
