@@ -78,9 +78,9 @@ GeneralUnorderedChangeObserver.prototype._listenForCollection = function () {
     case "changed":
       var changedFields = filterFields(message.fields, self._cursor._includeField);
       if (_.has(self._docs, message.id) && changedFields) {
+        applyObserveChanges(self._docs[message.id], message.fields);
         doc = _.extend({_id: LocalCollection._idParse(message.id)},
                        self._docs[message.id]);
-        applyObserveChanges(self._docs[message.id], message.fields);
         if (self._selectorFun(doc)) {
           self._callOrDefer(self._callbacks.changed, message.id, changedFields);
         } else {
