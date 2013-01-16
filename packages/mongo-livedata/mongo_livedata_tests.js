@@ -125,6 +125,7 @@ Tinytest.addAsync("mongo-livedata - basics, " + idGeneration, function (test, on
 
   // sleep function from fibers docs.
   var sleep = function(ms) {
+    var Fiber = __meteor_bootstrap__.require('fibers');
     var fiber = Fiber.current;
     setTimeout(function() {
       fiber.run();

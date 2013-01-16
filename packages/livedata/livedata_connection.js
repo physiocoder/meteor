@@ -4,11 +4,6 @@ if (Meteor.isServer) {
   var Future = __meteor_bootstrap__.require(path.join('fibers', 'future'));
 }
 
-// list of subscription tokens outstanding during a captureDependencies
-// run. only set when we're doing a run. The fact that this is a singleton means
-// we can't do recursive Meteor.autosubscribe().
-var captureSubs = null;
-
 // @param url {String|Object} URL to Meteor app,
 //   or an object as a test hook (see code)
 // Options:
@@ -146,11 +141,14 @@ Meteor._LivedataConnection = function (url, options) {
   // if we're blocking a migration, the retry func
   self._retryMigrate = null;
 
-  // metadata for subscriptions
-  self._subCollection = new LocalCollection;
-  // keyed by sub._id. value is unset or an array. if set, sub is not
-  // yet ready.
-  self._subReadyCallbacks = {};
+  // metadata for subscriptions.  Map from sub ID to object with keys:
+  //   - id
+  //   - name
+  //   - params
+  //   - context (the Context in which Meteor.subscribe was called, if any)
+  //   - completeCallbacks (list of onComplete callbacks to call when ready,
+  //                        or null if completion has already happened)
+  self._subscriptions = {};
 
   // Per-connection scratch area. This is only used internally, but we
   // should have real and documented API for this sort of thing someday.
@@ -262,12 +260,12 @@ Meteor._LivedataConnection = function (url, options) {
 
     // add new subscriptions at the end. this way they take effect after
     // the handlers and we don't see flicker.
-    self._subCollection.find().forEach(function (sub) {
+    _.each(self._subscriptions, function (sub, id) {
       self._send({
         msg: 'sub',
-        id: sub._id,
+        id: id,
         name: sub.name,
-        params: sub.args
+        params: sub.params
       });
     });
   });
@@ -280,29 +278,6 @@ Meteor._LivedataConnection = function (url, options) {
       Meteor._reload.reload();
     });
   }
-
-  // we never terminate the observe, since there is no way to destroy a
-  // LivedataConnection... but this shouldn't matter, since we're the only one
-  // that holds a reference to self._subCollection
-  self._subCollection.find({})._observeUnordered({
-    added: function (sub) {
-      self._send({
-        msg: 'sub',
-        id: sub._id,
-        name: sub.name,
-        params: sub.args
-      });
-    },
-    changed: function (sub) {
-      if (sub.count <= 0) {
-        // minimongo not re-entrant.
-        _.defer(function () { self._subCollection.remove({_id: sub._id}); });
-      }
-    },
-    removed: function (obj) {
-      self._send({msg: 'unsub', id: obj._id});
-    }
-  });
 };
 
 // A MethodInvoker manages sending a method to the server and calling the user's
@@ -437,52 +412,96 @@ _.extend(Meteor._LivedataConnection.prototype, {
 
   subscribe: function (name /* .. [arguments] .. callback */) {
     var self = this;
+
+    var params = Array.prototype.slice.call(arguments, 1);
+    if (params.length && typeof params[params.length - 1] === "function")
+      var onComplete = params.pop();
+
+    // Is there an existing sub with the same name and param, run in an
+    // invalidated Context? This can only happen if the context just got
+    // invalidated and we haven't fully finished a round of Meteor.flush()
+    // yet. For example, this will happen with the pattern of:
+    //   Meteor.autorun(function () {
+    //     Meteor.subscribe("foo", Session.get("foo"));
+    //     Meteor.subscribe("bar", Session.get("bar"));
+    //   });
+    // if "foo" has changed but "bar" has not: we are being careful to not unsub
+    // and resub to the "bar" subscription.
+    //
+    // We only look for one such sub; if there are N apparently-identical subs
+    // being invalidated, we will require N matching subscribe calls to keep
+    // them all active.
+    var existing = _.find(self._subscriptions, function (sub) {
+      return sub.context && sub.context.invalidated && sub.name === name &&
+        EJSON.equals(sub.params, params);
+    });
+
+    var currentContext = Meteor.deps && Meteor.deps.Context.current;
     var id;
+    if (existing) {
+      id = existing.id;
+      // Substitute our current context (if any) for the one on the sub.
+      existing.context = currentContext;
 
-    var args = Array.prototype.slice.call(arguments, 1);
-    if (args.length && typeof args[args.length - 1] === "function")
-      var callback = args.pop();
-
-    // Look for existing subs (ignore those with count=0, since they're going to
-    // get removed on the next time through the event loop).
-    var existing = self._subCollection.find(
-      {name: name, args: args, count: {$gt: 0}},
-      {reactive: false}).fetch();
-
-    if (existing && existing[0]) {
-      // already subbed, inc count.
-      id = existing[0]._id;
-      self._subCollection.update({_id: id}, {$inc: {count: 1}});
-
-      if (callback) {
-        if (self._subReadyCallbacks[id])
-          self._subReadyCallbacks[id].push(callback);
+      if (onComplete) {
+        if (existing.completeCallbacks)
+          existing.completeCallbacks.push(onComplete);
         else
-          callback(); // XXX maybe _.defer?
+          onComplete(); // XXX maybe _.defer?
       }
     } else {
-      // new sub, add object.
-      // generate our own id so we can know it w/ a find afterwards.
-      id = LocalCollection.uuid();
-      self._subCollection.insert({_id: id, name: name, args: args, count: 1});
-
-      self._subReadyCallbacks[id] = [];
-
-      if (callback)
-        self._subReadyCallbacks[id].push(callback);
+      // New sub! Generate an id, save it locally, and send message.
+      id = Meteor.uuid();
+      self._subscriptions[id] = {
+        id: id,
+        name: name,
+        params: params,
+        context: currentContext,
+        completeCallbacks: onComplete ? [onComplete] : []
+      };
+      self._send({msg: 'sub', id: id, name: name, params: params});
     }
 
     // return an object with a stop method.
-    var token = {stop: function () {
-      if (!id) return; // must have an id (local from above).
-      // just update the database. observe takes care of the rest.
-      self._subCollection.update({_id: id}, {$inc: {count: -1}});
+    var handle = {stop: function () {
+      if (!_.has(self._subscriptions, id))
+        return;
+      self._send({msg: 'unsub', id: id});
+      // We assume that all unsubs are successful.
+      delete self._subscriptions[id];
     }};
 
-    if (captureSubs)
-      captureSubs.push(token);
+    if (currentContext) {
+      // We're in a reactive context, so we'd like to unsubscribe when the
+      // context is invalidated... but not if some *OTHER* onInvalidate callback
+      // on currentContext re-subscribes to the same subscription (eg, as part
+      // of an autorun). Meteor.flush guarantees that it won't interleave calls
+      // to currentContext's callbacks and unsubscribeContext's callbacks, so
+      // this ensures that by the time unsubscribeContext's onInvalidate
+      // callback is called, we've already re-run the autorun function (if this
+      // was an autorun context).
+      var unsubscribeContext = new Meteor.deps.Context;
+      unsubscribeContext.onInvalidate(function () {
+        // Did we already unsubscribe from this? Do nothing.
+        if (!_.has(self._subscriptions, id))
+          return;
+        // Did we substitute a new context in for this constitute in the
+        // "Substitute" block above? (eg, are we in an autorun and the re-run of
+        // the function subscribed to this again?)
+        if (self._subscriptions[id].context !== currentContext)
+          return;
+        // Nope, the only reason we are currently subscribed to this
+        // subscription is that *THIS* subscribe call wanted it to be so, and
+        // its context is invalidated, so it's time to unsubscribe.
+        handle.stop();
+      });
+      currentContext.onInvalidate(function () {
+        unsubscribeContext.invalidate();
+      });
 
-    return token;
+    }
+
+    return handle;
   },
 
   methods: function (methods) {
@@ -809,9 +828,9 @@ _.extend(Meteor._LivedataConnection.prototype, {
     // XXX We should also block reconnect quiescence until autopublish is done
     //     re-publishing to avoid flicker!
     self._subsBeingRevived = {};
-    self._subCollection.find({}).forEach(function (sub) {
-      if (!self._subReadyCallbacks[sub._id])
-        self._subsBeingRevived[sub._id] = true;
+    _.each(self._subscriptions, function (sub, id) {
+      if (!sub.completeCallbacks)
+        self._subsBeingRevived[id] = true;
     });
 
     // Arrange for "half-finished" methods to have their callbacks run, and
@@ -1058,8 +1077,15 @@ _.extend(Meteor._LivedataConnection.prototype, {
     // database. We can use a write fence to implement this.
     _.each(msg.subs, function (subId) {
       self._runWhenAllServerDocsAreFlushed(function () {
-        _.each(self._subReadyCallbacks[subId], function (c) { c(); });
-        delete self._subReadyCallbacks[subId];
+        var subRecord = self._subscriptions[subId];
+        // Did we already unsubscribe?
+        if (!subRecord)
+          return;
+        // Did we already receive a complete message? (Oops!)
+        if (!subRecord.completeCallbacks)
+          return;
+        _.each(subRecord.completeCallbacks, function (c) { c(); });
+        subRecord.completeCallbacks = null;
       });
     });
   },
@@ -1083,8 +1109,15 @@ _.extend(Meteor._LivedataConnection.prototype, {
     };
     _.each(self._serverDocuments, function (collectionDocs) {
       _.each(collectionDocs, function (serverDoc) {
-        ++unflushedServerDocCount;
-        serverDoc.flushCallbacks.push(onServerDocFlush);
+        var writtenByStubForAMethodWithSentMessage = _.any(
+          serverDoc.writtenByStubs, function (dummy, methodId) {
+            var invoker = self._methodInvokers[methodId];
+            return invoker && invoker.sentMessage;
+          });
+        if (writtenByStubForAMethodWithSentMessage) {
+          ++unflushedServerDocCount;
+          serverDoc.flushCallbacks.push(onServerDocFlush);
+        }
       });
     });
     if (unflushedServerDocCount === 0) {
@@ -1252,43 +1285,17 @@ _.extend(Meteor, {
       url, {reloadOnUpdate: _reloadOnUpdate});
     Meteor._LivedataConnection._allConnections.push(ret); // hack. see below.
     return ret;
-  },
-
-  autosubscribe: function (sub_func) {
-    var local_subs = [];
-    var context = new Meteor.deps.Context();
-
-    context.onInvalidate(function () {
-      // recurse.
-      Meteor.autosubscribe(sub_func);
-      // unsub after re-subbing, to avoid bouncing.
-      _.each(local_subs, function (x) { x.stop(); });
-    });
-
-    context.run(function () {
-      if (captureSubs)
-        throw new Error("Meteor.autosubscribe may not be called recursively");
-
-      captureSubs = [];
-      try {
-        sub_func();
-      } finally {
-        local_subs = captureSubs;
-        captureSubs = null;
-      }
-    });
   }
 });
-
 
 // Hack for `spiderable` package: a way to see if the page is done
 // loading all the data it needs.
 Meteor._LivedataConnection._allConnections = [];
 Meteor._LivedataConnection._allSubscriptionsReady = function () {
   return _.all(Meteor._LivedataConnection._allConnections, function (conn) {
-    for (var k in conn._subReadyCallbacks)
-      return false;
-    return true;
+    return _.all(conn._subscriptions, function (sub) {
+      return !sub.completeCallbacks;
+    });
   });
 };
 })();
