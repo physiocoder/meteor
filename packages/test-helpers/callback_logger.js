@@ -19,6 +19,26 @@ CallbackLogger.prototype.expectResult = function (callbackName, args) {
   self._test.equal(result.args, args);
 };
 
+CallbackLogger.prototype.expectResultUnordered = function (list) {
+  var self = this;
+  list = _.clone(list); // shallow copy.
+  var i = list.length;
+  while (i > 0) {
+    var found = false;
+    var dequeued = self._log.shift();
+    for (var j = 0; j < list.length; j++) {
+      if (_.isEqual(list[j], dequeued)) {
+        list.splice(j, 1);
+        found = true;
+        break;
+      }
+    }
+    if (!found)
+      self._test.fail("Found unexpected result: " + JSON.stringify(dequeued));
+    i--;
+  }
+};
+
 CallbackLogger.prototype.expectNoResult = function () {
   var self = this;
   self._test.length(self._log, 0);

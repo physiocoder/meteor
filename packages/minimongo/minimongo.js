@@ -43,7 +43,7 @@ LocalCollection = function (name, bus) {
         LocalCollection._recomputeResults(query);
         query.needsRecompute = false;
       }
-    });
+     });
   });
 };
 

@@ -36,6 +36,133 @@ var applyObserveChanges = function (target, changes) {
 };
 
 
+var GeneralUnorderedChangeObserver = function (cursor, callbacks, selectorFun) {
+  var self = this;
+  self._callbacks = callbacks;
+  self._cursor = cursor;
+  self._selectorFun = selectorFun;
+  self._docs = {};
+
+  self._atomicBatchState = null;
+
+  self._cursor.forEach(function (doc) {
+    var id = LocalCollection._idStringify(doc._id);
+    self._docs[id] = _.omit(doc, '_id');
+    self._callbacks.added
+      && self._callbacks.added(id, filterFields(self._docs[id],
+                                                self._cursor._includeField));
+  });
+
+  self._listenForCollection();
+  self._listenForBatches();
+};
+
+GeneralUnorderedChangeObserver.prototype._callOrDefer = callOrDefer;
+
+GeneralUnorderedChangeObserver.prototype._listenForCollection = function () {
+  var self = this;
+  self._idListener = self._cursor.collection._listenWithCollection(
+      {},
+      function (message) {
+    var doc = null;
+    switch (message.msg) {
+    case "added":
+      doc = _.extend({_id: LocalCollection._idParse(message.id)},
+                     message.fields);
+      var addedFields = filterFields(message.fields, self._cursor._includeField);
+      if (self._selectorFun(doc) && addedFields) {
+        self._docs[message.id] = message.fields;
+        self._callOrDefer(self._callbacks.added, message.id, addedFields);
+      }
+      return;
+    case "changed":
+      var changedFields = filterFields(message.fields, self._cursor._includeField);
+      if (_.has(self._docs, message.id) && changedFields) {
+        doc = _.extend({_id: LocalCollection._idParse(message.id)},
+                       self._docs[message.id]);
+        applyObserveChanges(self._docs[message.id], message.fields);
+        if (self._selectorFun(doc)) {
+          self._callOrDefer(self._callbacks.changed, message.id, changedFields);
+        } else {
+          delete self._docs[message.id];
+          self._callOrDefer(self._callbacks.removed, message.id);
+        }
+      } else {
+        doc = self._cursor.collection.findOne(LocalCollection._idParse(message.id));
+        // make sure changes are applied
+        applyObserveChanges(doc, message.fields);
+        if (self._selectorFun(doc)) {
+          // from the perspective of this observeChanges, it's a new document
+          self._docs[message.id] = _.omit(doc, '_id');
+          self._callOrDefer(self._callbacks.added,
+                            message.id,
+                            filterFields(doc, self._cursor._includeField));
+        }
+      }
+      return;
+    case "removed":
+      if (_.has(self._docs, message.id)) {
+        delete self._docs[message.id];
+        self._callOrDefer(self._callbacks.removed, message.id);
+      }
+      return;
+    }
+  });
+};
+
+GeneralUnorderedChangeObserver.prototype._sendAtomicBatchDifferences = function () {
+  var self = this;
+  LocalCollection._diffObjects(self._atomicBatchState.docs, self._docs, {
+    leftOnly: function (id, leftValue) {
+      self._callbacks.removed && self._callbacks.removed(id);
+    },
+    rightOnly: function (id, rightValue) {
+      self._callbacks.added
+        && self._callbacks.added(id, filterFields(rightValue,
+                                                  self._cursor._includeField));
+    },
+    both: function (id, leftValue, rightValue) {
+          var changeFields = {};
+      LocalCollection._diffObjects(leftValue, rightValue, {
+        leftOnly: function (key, leftValue) {
+          if (key !== '_id')
+            changeFields[key] = undefined;
+        },
+        rightOnly: function (key, rightValue) {
+          if (key !== '_id')
+            changeFields[key] = rightValue;
+        },
+        both: function (key, leftValue, rightValue) {
+          if (key !== '_id' && !LocalCollection._f._equal(leftValue, rightValue))
+            changeFields[key] = rightValue;
+        }
+      });
+      changeFields = filterFields(changeFields, self._cursor.includeField);
+      if (changeFields) {
+        self._callbacks.changed(id, filterFields(changeFields, self._cursor.includeField));
+      }
+    }
+  });
+};
+
+GeneralUnorderedChangeObserver.prototype._listenForBatches = function () {
+  var self = this;
+  self._enterAtomicListener = self._cursor.collection._bus.onEnterAtomic(function () {
+    self._atomicBatchState = {
+      docs: EJSON.clone(self._docs),
+      modified: false
+    };
+  });
+  self._leaveAtomicListener = self._cursor.collection._bus.onLeaveAtomic(function () {
+    if (!self._atomicBatchState)
+      throw new Error("Leave atomic without enter atomic!");
+    if (self._atomicBatchState.modified)
+      self._sendAtomicBatchDifferences();
+    self._atomicBatchState = null;
+  });
+};
+
+
 var SingleIdChangeObserver = function (cursor, id, ordered, callbacks) {
   var self = this;
   self._callbacks = callbacks;
@@ -154,7 +281,7 @@ SingleIdChangeObserver.prototype.stop = function () {
 
 
 
-// callbacks is an object of the form:
+ // callbacks is an object of the form:
 // { added, changed, removed }
 // or { addedBefore, changed, removed, movedBefore }
 LocalCollection.Cursor.prototype.observeChanges = function (callbacks) {
@@ -172,7 +299,10 @@ LocalCollection.Cursor.prototype.observeChanges = function (callbacks) {
     }
     return new SingleIdChangeObserver(self, self.selector_id, ordered, callbacks);
   }
-  throw new Error("Unimplemented");
+  if (ordered)
+    throw new Error("Unimplemented");
+  else
+    return new GeneralUnorderedChangeObserver(self, callbacks, self.selector_f);
 };
 
 
