@@ -181,3 +181,33 @@ Tinytest.add("observeChanges - unordered - enters and exits result set through c
   logger.expectResult("added", ["foo", {noodles: "good", potatoes: "tasty", apples: "ok"}]);
   logger.expectNoResult();
 });
+
+
+Tinytest.add("observeChanges - unordered - atomic", function (test) {
+  var c = new LocalCollection();
+  var logger = new CallbackLogger(test, ["added", "changed", "removed"]);
+  c.find({noodles: "good"}).observeChanges(logger);
+
+  var batch = c._bus.startBatch(true);
+  logger.expectNoResult();
+  c.insert({_id: "bar", thing: "stuff"});
+  logger.expectNoResult();
+
+  c.insert({_id: "foo", noodles: "good", bacon: "bad", apples: "ok"});
+  c.update("foo", {noodles: "alright", potatoes: "tasty", apples: "ok"});
+  batch.endBatch();
+  logger.expectNoResult();
+
+  batch = c._bus.startBatch(true);
+  c.remove("foo");
+  logger.expectNoResult();
+  c.remove("bar");
+  logger.expectNoResult();
+
+  c.insert({_id: "foo", noodles: "good", bacon: "bad", apples: "ok"});
+  logger.expectNoResult();
+  c.update("foo", {noodles: "good", potatoes: "tasty", apples: "ok"});
+  batch.endBatch();
+  logger.expectResult("added", ["foo", {noodles: "good", potatoes: "tasty", apples: "ok"}]);
+  logger.expectNoResult();
+});
