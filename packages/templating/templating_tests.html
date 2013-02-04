@@ -255,11 +255,15 @@
 </template>
 
 <template name="test_template_helpers_b">
-  {{name}}{{arity}}{{toString}}{{length}}{{var}}
+  {{name}}{{arity}}{{toString}}{{length}}{{var}}{{chickensArePink}}
 </template>
 
 <template name="test_template_helpers_c">
-  {{name}}{{arity}}{{toString}}{{length}}{{var}}x
+  {{var}}{{chickensArePink}}x
+</template>
+
+<template name="test_template_helpers_d">
+  {{TemplateTestA}}{{TemplateTestB}}{{TemplateTestC.dog.puppy}}{{TemplateTestD.ooze.slime}}
 </template>
 
 <template name="test_template_events_a">
@@ -362,4 +366,8 @@
 {{# with value2}}{{this}}{{else}}xxx{{/with}}
 {{# with value1}}{{this}}{{/with}}
 {{# with value2}}{{this}}{{/with}}
+</template>
+
+<template name="test_controller_block">
+  {{#controller MindController}}asdf{{/controller}}
 </template>

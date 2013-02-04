@@ -1356,6 +1356,231 @@ Tinytest.add("spark - labeled landmarks", function (test) {
 });
 
 
+Tinytest.add("spark - landmark parents", function (test) {
+  var R = ReactiveVar(10);
+  var R2 = ReactiveVar('power');
+  var R3 = ReactiveVar(false);
+  var x = [];
+  var expect = function (what) {
+    test.equal(x, what);
+    x = [];
+  };
+
+  var runTests = function (what) {
+    return function () {
+      var self = this;
+      x.push([what, this.name, _.map(tests, function (arg) {
+        var p = self.parent(arg);
+        return (p === null) ? null : p.name;
+      })]);
+    };
+  };
+
+  var makeController = function (name) {
+    return Spark.Landmark.extend({
+      name: name,
+      init: runTests("init"),
+      rendered: runTests("rendered"),
+      finalize: runTests("finalize")
+    });
+  };
+
+  var controllers = {
+    a: makeController("a"),
+    b: makeController("b"),
+    c: makeController("c"),
+    d: makeController("d")
+  };
+
+  var tests = [undefined, controllers.a, controllers.b, controllers.c];
+
+  var htmlFunc = function () {
+    return Spark.isolate(function () {
+      return Spark.attachController(controllers.a, function () {
+        var wantB = R.get() > 5;
+        var getInner = function () {
+          return Spark.labelBranch("cbranch", function () {
+            return Spark.isolate(function () {
+              return Spark.attachController(controllers.c, function () {
+                return "kitten" + R2.get() +
+                  Spark.labelBranch("dbranch", function () {
+                    return Spark.isolate(function () {
+                      return ((R3.get() === false) ? "" :
+                              Spark.attachController(controllers.d, function () {
+                                return " and puppies too";
+                              }));
+                    });
+                  });
+              });
+            });
+          });
+        };
+
+        return Spark.labelBranch("bbranch", function () {
+          if (wantB)
+            return Spark.attachController(controllers.b, getInner);
+          else
+            return getInner();
+        });
+      });
+    });
+  };
+  var div = OnscreenDiv(Spark.render(htmlFunc));
+
+  expect([["init", "a", [null, null, null, null]],
+          ["init", "b", ["a", "a", null, null]],
+          ["init", "c", ["b", "a", "b", null]]]);
+  Meteor.flush();
+  expect([["rendered", "c", ["b", "a", "b", null]],
+          ["rendered", "b", ["a", "a", null, null]],
+          ["rendered", "a", [null, null, null, null]]]);
+  test.equal(div.text(), 'kittenpower');
+  R.set(11);
+  Meteor.flush();
+  expect([["rendered", "c", ["b", "a", "b", null]],
+          ["rendered", "b", ["a", "a", null, null]],
+          ["rendered", "a", [null, null, null, null]]]);
+  R.set(3);
+  Meteor.flush();
+  expect([["finalize", "b", [null, null, null, null]],
+          ["rendered", "c", ["a", "a", null, null]],
+          ["rendered", "a", [null, null, null, null]]]);
+  R.set(10);
+  Meteor.flush();
+  expect([["init", "b", ["a", "a", null, null]],
+          ["rendered", "c", ["b", "a", "b", null]],
+          ["rendered", "b", ["a", "a", null, null]],
+          ["rendered", "a", [null, null, null, null]]]);
+  R2.set('magic');
+  Meteor.flush();
+  test.equal(div.text(), 'kittenmagic');
+  expect([["rendered", "c", ["b", "a", "b", null]],
+          ["rendered", "b", ["a", "a", null, null]],
+          ["rendered", "a", [null, null, null, null]]]);
+  R3.set(true);
+  Meteor.flush();
+  test.equal(div.text(), 'kittenmagic and puppies too');
+  expect([["init", "d", ["c", "a", "b", "c"]],
+          ["rendered", "d", ["c", "a", "b", "c"]],
+          ["rendered", "c", ["b", "a", "b", null]],
+          ["rendered", "b", ["a", "a", null, null]],
+          ["rendered", "a", [null, null, null, null]]]);
+  div.kill();
+  Meteor.flush();
+  expect([["finalize", "a", [null, null, null, null]],
+          ["finalize", "b", [null, null, null, null]],
+          ["finalize", "c", [null, null, null, null]],
+          ["finalize", "d", [null, null, null, null]]]);
+
+  test.equal(htmlFunc(), "kittenmagic and puppies too");
+  expect([["init", "a", [null, null, null, null]],
+          ["init", "b", ["a", "a", null, null]],
+          ["init", "c", ["b", "a", "b", null]],
+          ["init", "d", ["c", "a", "b", "c"]],
+          ["finalize", "d", [null, null, null, null]],
+          ["finalize", "c", [null, null, null, null]],
+          ["finalize", "b", [null, null, null, null]],
+          ["finalize", "a", [null, null, null, null]]]);
+});
+
+
+Tinytest.add("spark - events on landmarks", function (test) {
+  var x = [];
+  var expect = function (what) {
+    test.equal(x.sort(), what.sort());
+    x = [];
+  };
+
+  var contexts = {
+    kitten: {kitten: true},
+    puppy: {puppy: true},
+    dolphin: {dolphin: true}
+  };
+
+  var handler = function (type, clsname, testname, data) {
+    return function (evt, d) {
+      x.push(testname + "@" + this.serial);
+      test.instanceOf(this, controllers[clsname]);
+      test.equal(evt.type, type);
+      test.equal(d, data);
+    };
+  };
+
+  var nextSerial = 0;
+  var CA = Spark.Landmark.extend({
+    init: function () {
+      this.serial = nextSerial++;
+    },
+    events: {
+      'click .x': handler("click", "CA", "cax", contexts.dolphin),
+      'click .y': 'dostuff',
+      'click .x ': handler("click", "CA", "cax2", contexts.dolphin)
+    },
+    dostuff: handler("click", "CA", "cay", contexts.puppy),
+    dostuff2: handler("click", "CC", "ccw", contexts.puppy)
+  });
+
+  var CB = CA.extend({
+    /* Nothing (test that CA events aren't installed twice) */
+  });
+
+  var CC = CB.extend({
+    events: {
+      'click .x': handler("click", "CA", "ccx", contexts.dolphin),
+      'click .z': 'zzz',
+      'click .w': 'dostuff2'
+    },
+    zzz: handler("click", "CC", "ccz", contexts.puppy)
+  });
+
+  var controllers = {
+    CA: CA,
+    CB: CB,
+    CC: CC
+  };
+
+  var div = OnscreenDiv(Spark.render(function () {
+    var html = Spark.attachController(CA, function () {
+      return Spark.labelBranch("bbranch", function () {
+        return Spark.attachController(CB, function () {
+          return Spark.labelBranch("cbranch", function () {
+            return Spark.attachController(CC, function () {
+              var html = "<div class='x' id='idx'></div>";
+              html = Spark.setDataContext(contexts.dolphin, html);
+              html +=
+                "<div class='y' id='idy'></div>" +
+                "<div class='z' id='idz'></div>" +
+                "<div class='w' id='idw'></div>";
+              html = Spark.setDataContext(contexts.puppy, html);
+              return html;
+            });
+          });
+        });
+      });
+    });
+    return Spark.setDataContext(contexts.kitten, html);
+  }));
+
+  var eltx = document.getElementById('idx');
+  var elty = document.getElementById('idy');
+  var eltz = document.getElementById('idz');
+  var eltw = document.getElementById('idw');
+
+  clickElement(eltx);
+  expect(["cax@0", "cax@1", "cax@2",
+          "cax2@0", "cax2@1", "cax2@2",
+          "ccx@2"]);
+  clickElement(elty);
+  expect(["cay@0", "cay@1", "cay@2"]);
+  clickElement(eltz);
+  expect(["ccz@2"]);
+  clickElement(eltw);
+  expect(["ccw@2"]);
+
+  div.kill();
+  Meteor.flush();
+});
+
 Tinytest.add("spark - preserve copies attributes", function(test) {
   // make sure attributes are correctly changed (i.e. copied)
   // when preserving old nodes, either because they are labeled

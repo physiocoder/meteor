@@ -25,8 +25,6 @@
 // timer' button again. the problem is almost certainly in afterFlush
 // (not hard to see what it is.)
 
-Spark = {};
-
 Spark._currentRenderer = (function () {
   var current = null;
   return {
@@ -41,6 +39,8 @@ Spark._currentRenderer = (function () {
     }
   };
 })();
+
+Spark._currentLandmark = new Meteor.EnvironmentVariable;
 
 Spark._TAG = "_spark_" + Random.id();
 // XXX document contract for each type of annotation?
@@ -381,7 +381,7 @@ var scheduleOnscreenSetup = function (frag, landmarkRanges) {
     // onscreen (possibly not for the first time.)
     _.each(landmarkRanges, function (landmarkRange) {
       if (! landmarkRange.isPreservedConstant)
-        landmarkRange.rendered.call(landmarkRange.landmark);
+        landmarkRange.landmark.rendered();
     });
 
     // Deliver render callbacks to all landmarks that enclose the
@@ -395,7 +395,7 @@ var scheduleOnscreenSetup = function (frag, landmarkRanges) {
     // case from the previous
     var walk = renderedRange;
     while ((walk = findParentOfType(Spark._ANNOTATION_LANDMARK, walk)))
-      walk.rendered.call(walk.landmark);
+      walk.landmark.rendered();
 
     // This code can run several times on the same nodes (if the
     // output of a render is included in a render), so it must be
@@ -583,7 +583,25 @@ Spark.renderToRange = function (range, htmlFunc) {
     node._currentChecked = [!!node.checked];
   });
 
-  var frag = renderer.materialize(htmlFunc);
+  // Render the new fragment, setting Spark._currentLandmark to the
+  // nearest enclosing landmark in the place where the fragment will
+  // be placed
+  var enclosingLandmarkRange = range;
+  do {
+    if (! enclosingLandmarkRange.firstNode().parentNode) {
+      // detect malformed LiveRange, in case where we are rendering to a DOM island
+      enclosingLandmarkRange = null;
+      break;
+    }
+    enclosingLandmarkRange = enclosingLandmarkRange.findParent();
+  } while (enclosingLandmarkRange &&
+           enclosingLandmarkRange.type !== Spark._ANNOTATION_LANDMARK);
+  var enclosingLandmark = enclosingLandmarkRange &&
+        enclosingLandmarkRange.landmark;
+
+  var frag = renderer.materialize(function () {
+    return Spark._currentLandmark.withValue(enclosingLandmark, htmlFunc);
+  });
 
   DomUtils.wrapFragmentForContainer(frag, range.containerNode());
 
@@ -595,10 +613,10 @@ Spark.renderToRange = function (range, htmlFunc) {
   visitLandmarksInRange(
     tempRange, function (landmarkRange, notes) {
       if (notes.originalRange) {
-        if (landmarkRange.constant)
+        if (landmarkRange.landmark.constant)
           pc.addConstantRegion(notes.originalRange, landmarkRange);
 
-        pc.addRoot(landmarkRange.preserve,
+        pc.addRoot(landmarkRange.landmark._preservations,
                    notes.originalRange, landmarkRange);
       }
     });
@@ -615,8 +633,9 @@ Spark.renderToRange = function (range, htmlFunc) {
       // on a "malformed" liverange tree
       break;
 
-    if (walk.type === Spark._ANNOTATION_LANDMARK, walk)
-      pc.addRoot(walk.preserve, range, tempRange, walk.containerNode());
+    if (walk.type === Spark._ANNOTATION_LANDMARK)
+      pc.addRoot(walk.landmark._preservations, range, tempRange,
+                 walk.containerNode());
   }
 
   pc.addRoot(Spark._globalPreserves, range, tempRange);
@@ -718,29 +737,29 @@ var getListener = function () {
   return universalListener;
 };
 
-Spark.attachEvents = withRenderer(function (eventMap, html, _renderer) {
+// eventMaps may be either a single event maps, or a list of event maps.
+Spark.attachEvents = withRenderer(function (eventMaps, html, _renderer) {
   var listener = getListener();
+
+  if (! (eventMaps instanceof Array))
+    eventMaps = [eventMaps];
 
   var handlerMap = {}; // type -> [{selector, callback}, ...]
   // iterate over eventMap, which has form {"type selector, ...": callbacks},
-  // callbacks can either be a fn, or an array of fns
   // and populate handlerMap
-  _.each(eventMap, function(callbacks, spec) {
-    if ('function' === typeof callbacks) {
-      callbacks = [ callbacks ];
-    }
-    var clauses = spec.split(/,\s+/);
-    // iterate over clauses of spec, e.g. ['click .foo', 'click .bar']
-    _.each(clauses, function (clause) {
-      var parts = clause.split(/\s+/);
-      if (parts.length === 0)
-        return;
+  _.each(eventMaps, function (eventMap) {
+    _.each(eventMap, function(callback, spec) {
+      var clauses = spec.split(/,\s+/);
+      // iterate over clauses of spec, e.g. ['click .foo', 'click .bar']
+      _.each(clauses, function (clause) {
+        var parts = clause.split(/\s+/);
+        if (parts.length === 0)
+          return;
 
-      var type = parts.shift();
-      var selector = parts.join(' ');
+        var type = parts.shift();
+        var selector = parts.join(' ');
 
-      handlerMap[type] = handlerMap[type] || [];
-      _.each(callbacks, function(callback) {
+        handlerMap[type] = handlerMap[type] || [];
         handlerMap[type].push({selector: selector, callback: callback});
       });
     });
@@ -990,7 +1009,7 @@ Spark.list = function (cursor, itemFunc, elseFunc) {
   var notifyParentsRendered = function () {
     var walk = outerRange;
     while ((walk = findParentOfType(Spark._ANNOTATION_LANDMARK, walk)))
-      walk.rendered.call(walk.landmark);
+      walk.landmark.rendered();
   };
 
   var later = function (f) {
@@ -1069,35 +1088,6 @@ Spark.list = function (cursor, itemFunc, elseFunc) {
 /* Labels and landmarks                                                       */
 /******************************************************************************/
 
-var nextLandmarkId = 1;
-
-Spark.Landmark = function () {
-  this.id = nextLandmarkId++;
-  this._range = null; // will be set when put onscreen
-};
-
-_.extend(Spark.Landmark.prototype, {
-  firstNode: function () {
-    return this._range.firstNode();
-  },
-  lastNode: function () {
-    return this._range.lastNode();
-  },
-  find: function (selector) {
-    var r = this._range;
-    return DomUtils.findClipped(r.containerNode(), selector,
-                                r.firstNode(), r.lastNode());
-  },
-  findAll: function (selector) {
-    var r = this._range;
-    return DomUtils.findAllClipped(r.containerNode(), selector,
-                                   r.firstNode(), r.lastNode());
-  },
-  hasDom: function () {
-    return !! this._range;
-  }
-});
-
 Spark.UNIQUE_LABEL = ['UNIQUE_LABEL'];
 
 // label must be a string.
@@ -1140,27 +1130,60 @@ Spark.labelBranch = function (label, htmlFunc) {
 };
 
 Spark.createLandmark = function (options, htmlFunc) {
+  var controller = Spark.Landmark.extend({
+    init: function () {
+      if (options.created)
+        options.created.call(this);
+    },
+    finalize: function () {
+      if (this._destroyed)
+        this._destroyed.call(this);
+    },
+    rendered: function () {
+      if (this._rendered)
+        this._rendered.call(this);
+    }
+  });
+
+  return Spark.attachController(controller, function (instance) {
+    // Copy options over in case the controller was preserved but
+    // closed over a different environment this time
+    instance._rendered = options.rendered;
+    instance._destroyed = options.destroyed;
+    instance.constant = options.constant;
+    instance.setPreserve(options.preserve);
+    return htmlFunc(instance);
+  });
+};
+
+// Argument: (controller, [controller args,] htmlFunc)
+// controller is a Spark.Landmark subclass (the class itself, not an
+// instance of the class)
+Spark.attachController = function (controller, htmlFunc) {
+  if (! (controller.prototype instanceof Spark.Landmark))
+    throw new Error("Controller must be a subclass of Spark.Landmark");
+
+  var args = _.toArray(arguments);
+  args.shift();
+  var htmlFunc = args.pop();
+  if (typeof htmlFunc !== "function")
+    throw new Meteor.Error("Last argument to attachController must be a " +
+                           "function");
+
+  var parentLandmark = Spark._currentLandmark.get() || null;
   var renderer = Spark._currentRenderer.get();
   if (! renderer) {
     // no renderer -- create and destroy Landmark inline
-    var landmark = new Spark.Landmark;
-    options.created && options.created.call(landmark);
-    var html = htmlFunc(landmark);
-    options.destroyed && options.destroyed.call(landmark);
+    var landmark = new controller;
+    landmark._setInitialParent(parentLandmark);
+    landmark.init();
+    var html = Spark._currentLandmark.withValue(landmark, function () {
+      return htmlFunc(landmark);
+    });
+    landmark._setInitialParent(null);
+    landmark.finalize();
     return html;
   }
-
-  // Normalize preserve map
-  var preserve = {};
-  if (_.isArray(options.preserve))
-    _.each(options.preserve, function (selector) {
-      preserve[selector] = true;
-    });
-  else
-    preserve = options.preserve || {};
-  for (var selector in preserve)
-    if (typeof preserve[selector] !== 'function')
-      preserve[selector] = function () { return true; };
 
   renderer.currentBranch.mark('occupied');
   var notes = renderer.currentBranch.getNotes();
@@ -1170,43 +1193,93 @@ Spark.createLandmark = function (options, htmlFunc) {
       throw new Error("Can't create second landmark in same branch");
     notes.originalRange.superceded = true; // prevent destroyed(), second match
     landmark = notes.originalRange.landmark; // the old Landmark
+    landmark.recycle.apply(landmark, args);
   } else {
-    landmark = new Spark.Landmark;
-    if (options.created) {
-      // Run callback outside the current Spark.isolate's deps context.
-      Deps.nonreactive(function () {
-        options.created.call(landmark);
-      });
-    }
+    // Create Landmark outside the current Spark.isolate's deps context.
+    Deps.nonreactive(function () {
+      landmark = new controller;
+      landmark._setInitialParent(parentLandmark);
+      landmark.init.apply(landmark, args);
+    });
   }
   notes.landmark = landmark;
 
-  var html = htmlFunc(landmark);
+  // Gather event maps from controller class and its superclasses
+  var eventMaps = [];
+  var walk = controller;
+  var last;
+  do {
+    var theseEvents = walk.prototype.events;
+    if (theseEvents && theseEvents !== last) {
+      // If there is a chain of several superclasses, and not all of
+      // them define events, avoid including the same event map
+      // several times (because it's visible at each stage in the
+      // chain due to inheritance)
+      last = theseEvents;
+
+      // attachEvents invokes events as (event, enclosing landmark),
+      // with the template data at the event in 'this'.
+      //
+      // (1) rearrange that to (event, template data) with the
+      // controller in 'this'
+      //
+      // (2) allow a string instead of a function, which means to use
+      // the function on this controller by that name.
+      var wrappedEventMap = {};
+      _.each(theseEvents, function (handler, key) {
+        wrappedEventMap[key] = function (event, landmark) {
+          var data = this;
+          var f = handler;
+          if (typeof f === "string") {
+            if (! (f in landmark))
+              throw new Error("No function '" + f  + "' for event handler " +
+                              "on controller");
+            f = landmark[f];
+          }
+          return f.call(landmark, event, data);
+        };
+      });
+      eventMaps.push(wrappedEventMap);
+    }
+    walk = walk.superclass;
+  } while (walk);
+
+  // Assemble (possibly) annotated HTML
+  var html = Spark._currentLandmark.withValue(landmark, function () {
+    var innerHtml = htmlFunc(landmark);
+    if (eventMaps.length)
+      innerHtml = Spark.attachEvents(eventMaps, innerHtml);
+    return innerHtml
+  });
   return renderer.annotate(
     html, Spark._ANNOTATION_LANDMARK, function (range) {
       if (! range) {
         // annotation not used
-        options.destroyed && options.destroyed.call(landmark);
+        landmark.finalize();
         return;
       }
 
       _.extend(range, {
-        preserve: preserve,
-        constant: !! options.constant,
-        rendered: options.rendered || function () {},
-        destroyed: options.destroyed || function () {},
         landmark: landmark,
         finalize: function () {
-          if (! this.superceded) {
-            this.landmark._range = null;
-            this.destroyed.call(this.landmark);
-          }
+          if (! this.superceded)
+            this.landmark._tearDown();
         }
       });
 
-      landmark._range = range;
+      landmark._setRange(range);
       renderer.landmarkRanges.push(range);
     });
+};
+
+// XXX document
+
+// Call during rendering to get the current nearest enclosing
+// controller (aka Spark.Landmark subclass) -- that is, the controller
+// for the nearest enclosing attachController on the call stack, or
+// null if none.
+Spark.currentController = function () {
+  return Spark._currentLandmark.get() || null;
 };
 
 // used by unit tests
