@@ -195,7 +195,8 @@ _.extend(PackageInstance.prototype, {
     handler(self.bundle.api,
             path.join(self.pkg.source_root, rel_path),
             path.join(self.pkg.serve_root, rel_path),
-            where);
+            where,
+            self.pkg.name);
 
     self.dependencies[rel_path] = true;
   }

@@ -7,7 +7,7 @@ var fs = require('fs');
 var path = require('path');
 
 Package.register_extension(
-  "less", function (bundle, source_path, serve_path, where) {
+  "less", function (bundle, source_path, serve_path, where, inPackage) {
     serve_path = serve_path + '.css';
 
     var contents = fs.readFileSync(source_path, 'utf8');
@@ -19,7 +19,11 @@ Package.register_extension(
         // we don't have to use Futures and (b) errors thrown by bugs in less
         // actually get caught.
         syncImport: true,
-        paths: [path.resolve(source_path, '..')] // for @import
+        // package-less-overrides/<packagename> allows users to override particular less files
+        // in particular packages.  This is mostly useful for overidding bootstraps variables.less
+        paths: inPackage ? // for @import
+          [path.join('.', 'package-less-overrides', inPackage), path.resolve(source_path, '..')] :
+          [path.resolve(source_path, '..')]
       }, function (err, css) {
         if (err) {
           bundle.error(source_path + ": Less compiler error: " + err.message);
