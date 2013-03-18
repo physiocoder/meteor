@@ -308,6 +308,21 @@
     afterFlush: function (f) {
       afterFlushCallbacks.push(f);
       requireFlush();
+    },
+
+    isolate: function (f) {
+      var dep = new Deps.Dependency();
+      var result = Deps.nonreactive(f);
+      var computation = Deps.autorun(function () {
+        var newResult = f();
+        if (!EJSON.equals(result, newResult)) {
+          dep.changed();
+          computation.stop();
+          result = newResult;
+        }
+      });
+      Deps.depend(dep);
+      return result;
     }
 
 });

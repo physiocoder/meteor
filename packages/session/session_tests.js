@@ -182,4 +182,30 @@
       Deps.flush();
       test.equal(yEqualsExecutions, 3);
     });
+
+
+  Tinytest.add(
+    "session - Deps.isolate",
+    function (test) {
+      Session.set("complex", {a: 1, b: 1});
+      Session.set("simple", 1);
+      var runs = 0;
+      Deps.autorun(function () {
+        runs++;
+        Session.get("simple");
+        Deps.isolate(function () {
+          return Session.get("complex").a;
+        });
+      });
+      test.equal(runs, 1);
+      Session.set("simple", 2);
+      Deps.flush();
+      test.equal(runs, 2);
+      Session.set("complex", {a: 1, b: 2});
+      Deps.flush();
+      test.equal(runs, 2);
+      Session.set("complex", {a: 3, b: 2});
+      Deps.flush();
+      test.equal(runs, 3);
+    });
 }());
