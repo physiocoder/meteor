@@ -311,18 +311,21 @@
     },
 
     isolate: function (f) {
-      var dep = new Deps.Dependency();
-      var result = Deps.nonreactive(f);
-      var computation = Deps.autorun(function () {
-        var newResult = f();
-        if (!EJSON.equals(result, newResult)) {
-          dep.changed();
-          computation.stop();
-          result = newResult;
-        }
+      if (! Deps.active)
+        return f();
+
+      var resultDep = new Deps.Dependency;
+      var origResult;
+      Deps.autorun(function (c) {
+        var result = f();
+        if (c.firstRun)
+          origResult = result;
+        else if (!EJSON.equals(result, origResult))
+          resultDep.changed();
       });
-      Deps.depend(dep);
-      return result;
+      Deps.depend(resultDep);
+
+      return origResult;
     }
 
 });
