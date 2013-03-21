@@ -1,8 +1,8 @@
 // Client-side JavaScript, bundled and sent to client.
 
 // Define Minimongo collections to match server/publish.js.
-Lists = new Meteor.Collection("lists");
-Todos = new Meteor.Collection("todos");
+Lists = new Meteor.Collection("lists", {idGeneration: 'MONGO'});
+Todos = new Meteor.Collection("todos", {idGeneration: 'MONGO'});
 
 // ID of currently selected list
 Session.setDefault('list_id', null);
@@ -306,13 +306,14 @@ var TodosRouter = Backbone.Router.extend({
   },
   main: function (list_id) {
     var oldList = Session.get("list_id");
-    if (oldList !== list_id) {
+    list_id = list_id && new Meteor.Collection.ObjectID(list_id);
+    if (!EJSON.equals(oldList, list_id)) {
       Session.set("list_id", list_id);
       Session.set("tag_filter", null);
     }
   },
   setList: function (list_id) {
-    this.navigate(list_id, true);
+    this.navigate(list_id.toHexString(), true);
   }
 });
 
