@@ -1,0 +1,18 @@
+.reactive-vision-hidden {
+  background: orange;
+  opacity: 0;
+}
+
+.reactive-vision-fadein {
+  transition: opacity 1s linear;
+  -webkit-transition: opacity 1s linear;
+  -moz-transition: opacity 1s linear;
+  opacity: .5;
+}
+
+.reactive-vision-fadeout {
+  transition: opacity 1s linear;
+  -webkit-transition: opacity 1s linear;
+  -moz-transition: opacity 1s linear;
+  opacity: 0;
+}
