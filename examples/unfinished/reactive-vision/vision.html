@@ -1,0 +1,41 @@
+<head>
+  <title>vision</title>
+</head>
+
+<body>
+  <div class="left">
+    {{#constant}}
+      <ul id="logger">
+      </ul>
+    {{/constant}}
+  </div>
+
+  <div class="main">
+    {{> main}}
+  </div>
+</body>
+
+<template name="main">
+  <h1>Title: {{title}}</h1>
+
+  {{> textTemplate}}
+
+  {{> list}}
+</template>
+
+<template name="list">
+  <ul>
+    {{#each items}}
+      {{> listItem}}
+    {{/each}}
+  </ul>
+</template>
+
+<template name="listItem">
+  <li>{{title}}</li>
+</template>
+
+<template name="textTemplate">
+  <p>Text: {{text}}</p>
+</template>
+

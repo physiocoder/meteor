@@ -1,0 +1,30 @@
+/* CSS declarations go here */
+
+.left {
+  display: inline-block;
+  position: absolute;
+  height: 100%;
+  left: 0;
+  top: 0;
+  width: 600px;
+  overflow: scroll;
+  background: #eee;
+  font-size: 75%;
+  border-right: 1px solid #ccc;
+}
+
+.main {
+  margin-left: 600px;
+  background: #fff;
+  padding: 10px;
+}
+
+#logger {
+  list-style: none;
+  padding: 5px;
+  margin: 0px;
+}
+
+#logger li {
+  padding: 2px 0px;
+}
