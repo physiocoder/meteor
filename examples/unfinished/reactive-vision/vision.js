@@ -40,6 +40,7 @@ if (Meteor.isClient) {
   Meteor.startup(function () {
     Meteor.ReactiveVision.onLog(function (msg) {
       $('<li>').text(msg).appendTo('#logger');
+      $('.left')[0].scrollTop = $('#logger').height();
     });
   });
 }

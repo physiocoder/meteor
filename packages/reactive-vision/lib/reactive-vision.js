@@ -127,7 +127,7 @@
         position: 'absolute',
         background: self.options.background || 'orange',
         padding: self.options.padding || '0px',
-        border: self.options.border || '1px solid darkorange',
+        border: self.options.border || '1px solid red',
         opacity: 0,
         'z-index': 10000,
         top: rect.top,
@@ -149,13 +149,14 @@
     if (instance) return instance;
     instance = this;
 
+    this._logCounter = 0;
     this._log = [];
     this._wrapped = [];
     this._callbacks = [];
     this.options = {
       background: 'Orange',
       padding: '0px',
-      border: '1px solid DarkOrange'
+      border: '1px solid Red'
     };
 
     this.start();
@@ -178,6 +179,7 @@
     },
 
     clear: function () {
+      this._logCounter = 0;
       this._log = [];
     },
 
@@ -187,7 +189,7 @@
         var name = options.name && '"' + options.name + '"';
         type = (options.type || '') + ' ' + (name || '');
         message = [
-          (new Date).getTime(),
+          ++this._logCounter,
           ': ',
           type ? '<' + type + '> ' : ' ',
           msg
