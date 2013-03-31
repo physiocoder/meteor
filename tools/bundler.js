@@ -54,6 +54,13 @@ var ignore_files = [
     /^\.git$/ /* often has too many files to watch */
 ];
 
+
+var sha1 = exports.sha1 = function (contents) {
+  var hash = crypto.createHash('sha1');
+  hash.update(contents);
+  return hash.digest('hex');
+};
+
 ///////////////////////////////////////////////////////////////////////////////
 // PackageBundlingInfo
 ///////////////////////////////////////////////////////////////////////////////
@@ -187,6 +194,15 @@ _.extend(PackageBundlingInfo.prototype, {
       return;
     self.files[where][rel_path] = true;
 
+    var sourcePath = path.join(self.pkg.source_root, rel_path);
+    var fileContents = undefined;
+    if (self.bundle.fileHashes) {
+      // XXX for registered extensions, this hash has a race with the actual
+      // file contents re-read in the handler.
+      fileContents = fs.readFileSync(sourcePath);
+      self.bundle.fileHashes[sourcePath] = sha1(fileContents);
+    }
+
     var ext = files.findExtension(self.api.registered_extensions(), rel_path);
     // substr to remove the dot to translate between the with-dot world
     // of registered_extensions and the without dot world of
@@ -194,16 +210,19 @@ _.extend(PackageBundlingInfo.prototype, {
     var handler = ext && self.get_source_handler(ext.substr(1));
     if (handler) {
       handler(self.bundle.api,
-              path.join(self.pkg.source_root, rel_path),
+              sourcePath,
               path.join(self.pkg.serve_root, rel_path),
               where);
     } else {
       // If we don't have an extension handler, serve this file
       // as a static resource.
+      if (fileContents === undefined) {
+        fileContents = fs.readFileSync(sourcePath);
+      }
       self.bundle.api.add_resource({
         type: "static",
         path: path.join(self.pkg.serve_root, rel_path),
-        data: fs.readFileSync(path.join(self.pkg.source_root, rel_path)),
+        data: fileContents,
         where: where
       });
     }
@@ -264,6 +283,10 @@ var Bundle = function () {
 
   // list of errors encountered while bundling. array of string.
   self.errors = [];
+
+  // If the caller of bundle() wants them, a map from absolute path to SHA1 of
+  // all files read by this bundle. Used for dependency watching in the runner.
+  self.fileHashes = null;
 
   // the API available from register_extension handlers
   self.api = {
@@ -374,12 +397,6 @@ _.extend(Bundle.prototype, {
     return bundlingInfo;
   },
 
-  _hash: function (contents) {
-    var hash = crypto.createHash('sha1');
-    hash.update(contents);
-    return hash.digest('hex');
-  },
-
   _maybeUpdateNpmDependencies: function (pkg, inst) {
     var self = this;
     if (pkg.npmDependencies) {
@@ -402,6 +419,10 @@ _.extend(Bundle.prototype, {
   use: function (pkg, where, from) {
     var self = this;
     var inst = self._get_bundling_info_for_package(pkg);
+
+    if (self.fileHashes) {
+      _.extend(self.fileHashes, pkg.metadataFileHashes);
+    }
 
     if (from)
       from.using[pkg.id] = inst;
@@ -468,7 +489,7 @@ _.extend(Bundle.prototype, {
 
     var addFile = function (type, finalCode) {
       var contents = new Buffer(finalCode);
-      var hash = self._hash(contents);
+      var hash = sha1(contents);
       var name = '/' + hash + '.' + type;
       self.files.client_cacheable[name] = contents;
       self.manifest.push({
@@ -525,7 +546,11 @@ _.extend(Bundle.prototype, {
   _generate_app_html: function () {
     var self = this;
 
-    var template = fs.readFileSync(path.join(__dirname, "app.html.in"));
+    var appHtmlPath = path.join(__dirname, "app.html.in");
+    var template = fs.readFileSync(appHtmlPath);
+    if (self.fileHashes) {
+      self.fileHashes[appHtmlPath] = sha1(template);
+    }
     var f = require('handlebars').compile(template.toString());
     return f({
       scripts: self._clientUrlsFor('js'),
@@ -600,7 +625,7 @@ _.extend(Bundle.prototype, {
 
     // --- Static assets ---
 
-    var addClientFileToManifest = function (filepath, contents, type, cacheable, url) {
+    var addClientFileToManifest = function (filepath, contents, type, cacheable, url, hash) {
       if (! contents instanceof Buffer)
         throw new Error('contents must be a Buffer');
       var normalized = filepath.split(path.sep).join('/');
@@ -615,7 +640,7 @@ _.extend(Bundle.prototype, {
         url: url || '/' + normalized,
         // contents is a Buffer and so correctly gives us the size in bytes
         size: contents.length,
-        hash: self._hash(contents)
+        hash: hash || sha1(contents)
       });
     };
 
@@ -628,7 +653,13 @@ _.extend(Bundle.prototype, {
         _.each(copied, function (fs_relative_path) {
           var filepath = path.join(build_path, 'static', fs_relative_path);
           var contents = fs.readFileSync(filepath);
-          addClientFileToManifest(fs_relative_path, contents, 'static', false);
+          var hash = undefined;
+          if (self.fileHashes) {
+            hash = sha1(contents);
+            self.fileHashes[path.join(project_dir, public, fs_relative_path)]
+              = hash;
+          }
+          addClientFileToManifest(fs_relative_path, contents, 'static', false, undefined, hash);
         });
       }
       dependencies_json.app.push('public');
@@ -648,7 +679,7 @@ _.extend(Bundle.prototype, {
         contents = self.files.client[file];
         delete self.files.client[file];
         self.files.client_cacheable[file] = contents;
-        url = file + '?' + self._hash(contents)
+        url = file + '?' + sha1(contents)
       }
       else
         throw new Error('unable to find file: ' + file);
@@ -713,7 +744,7 @@ _.extend(Bundle.prototype, {
     self.manifest.push({
       path: 'app.html',
       where: 'internal',
-      hash: self._hash(app_html)
+      hash: sha1(app_html)
     });
     dependencies_json.core.push(path.join('tools', 'app.html.in'));
 
@@ -752,6 +783,9 @@ _.extend(Bundle.prototype, {
             _.keys(packageBundlingInfo.dependencies);
       }
     }
+
+    if (self.fileHashes)
+      dependencies_json.hashes = self.fileHashes;
 
     if (self.releaseStamp && self.releaseStamp !== 'none')
       app_json.release = self.releaseStamp;
@@ -826,6 +860,9 @@ exports.bundle = function (app_dir, output_path, options) {
     var bundle = new Bundle;
     bundle.releaseStamp = options.releaseStamp;
     bundle.packageSearchOptions = options.packageSearchOptions || {};
+    if (options.calculateFileHashes) {
+      bundle.fileHashes = {};
+    }
 
     // our release manifest is set, let's now load the app
     var app = packages.get_for_app(app_dir, ignore_files);
