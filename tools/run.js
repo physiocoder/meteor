@@ -632,15 +632,20 @@ exports.run = function (context, options) {
         relativeFiles = [options.settingsFile];
       }
 
-      watcher = new DependencyWatcher(deps_info, context.appDir, relativeFiles,
-                                      context.packageSearchOptions, mtimes,
-                                      function (previousMtimes) {
-        mtimes = previousMtimes;
-        if (Status.crashing)
-          log_to_clients({'system': "=> Modified -- restarting."});
-        Status.reset();
-        restart_server();
-      });
+      watcher = new DependencyWatcher(
+        deps_info, context.appDir, relativeFiles,
+        context.packageSearchOptions, mtimes,
+        function (previousMtimes) {
+          // Defer so restarts never happen synchronously before the server is
+          // even started.
+          _.defer(function () {
+            mtimes = previousMtimes;
+            if (Status.crashing)
+              log_to_clients({'system': "=> Modified -- restarting."});
+            Status.reset();
+            restart_server();
+          });
+        });
     }
   };
 
