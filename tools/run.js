@@ -317,16 +317,20 @@ var kill_server = function (handle) {
 // app_dir is the root of the app
 // relativeFiles are any other files to watch, relative to the current
 //   directory (eg, the --settings file)
+// previousMtimes is a dictionary of mtimes from a previous DependencyWatcher;
+// if the initial mtime we observe differs from what's there, that counts
+// as a change.
 // on_change is only fired once
 var DependencyWatcher = function (
-    deps, app_dir, relativeFiles, packageSearchOptions, on_change) {
+    deps, app_dir, relativeFiles, packageSearchOptions, previousMtimes,
+    on_change) {
   var self = this;
 
   self.app_dir = app_dir;
   self.on_change = on_change;
   self.watches = {}; // path => unwatch function with no arguments
   self.last_contents = {}; // path => last contents (array of filenames)
-  self.mtimes = {}; // path => last seen mtime
+  self.mtimes = previousMtimes || {}; // path => last seen mtime
 
   // If a file is under a source_dir, and has one of the
   // source_extensions, then it's interesting.
@@ -398,7 +402,7 @@ _.extend(DependencyWatcher.prototype, {
     var self = this;
 
     if (self._is_excluded(filepath))
-      return false;
+      return;
 
     try {
       var stats = fs.lstatSync(filepath);
@@ -406,17 +410,29 @@ _.extend(DependencyWatcher.prototype, {
       // doesn't exist -- leave stats undefined
     }
 
-    // '+' is necessary to coerce the mtimes from date objects to ints
-    // (unix times) so they can be conveniently tested for equality
-    if (stats && +stats.mtime === +self.mtimes[filepath])
-      // We already know about this file and it hasn't actually
-      // changed. Probably its atime changed.
-      return;
+    var mtimeHasChanged = false;
+    if (stats) {
+      if (_.has(self.mtimes, filepath)) {
+        // '+' is necessary to coerce the mtimes from date objects to ints (unix
+        // times) so they can be conveniently tested for equality
+        if (+stats.mtime === self.mtimes[filepath]) {
+          // We already know about this file and it hasn't actually
+          // changed. Probably its atime changed.  (If this is the initial call
+          // for this DependencyWatcher, we need to set up the watcher even if
+          // the mtime matches the mtime from a previous DependencyWatcher.)
+          if (!initial)
+            return;
+        } else {
+          mtimeHasChanged = true;
+        }
+      }
+      self.mtimes[filepath] = +stats.mtime;
+    }
 
     // If an interesting file has changed, fire!
     var is_interesting = self._is_interesting(filepath);
-    if (!initial && is_interesting) {
-      self.on_change();
+    if (mtimeHasChanged && is_interesting) {
+      self.on_change(self.mtimes);
       self.destroy();
       return;
     }
@@ -447,7 +463,6 @@ _.extend(DependencyWatcher.prototype, {
                      _.bind(self._scan, self, false, filepath));
         self.watches[filepath] = function() { watch.close(); };
       }
-      self.mtimes[filepath] = stats.mtime;
     }
 
     // If a directory, recurse into any new files it contains. (We
@@ -604,6 +619,7 @@ exports.run = function (context, options) {
     packageSearchOptions: context.packageSearchOptions
   };
 
+  var mtimes = {};
   var start_watching = function () {
     if (!Status.shouldRestart)
       return;
@@ -617,8 +633,9 @@ exports.run = function (context, options) {
       }
 
       watcher = new DependencyWatcher(deps_info, context.appDir, relativeFiles,
-                                      context.packageSearchOptions,
-                                      function () {
+                                      context.packageSearchOptions, mtimes,
+                                      function (previousMtimes) {
+        mtimes = previousMtimes;
         if (Status.crashing)
           log_to_clients({'system': "=> Modified -- restarting."});
         Status.reset();
