@@ -26,6 +26,7 @@
 //  - core [paths relative to 'app' in meteor tree]
 //  - app [paths relative to top of app tree]
 //  - exclude [list of regexps for files to ignore (everywhere)]
+//  - hashes [SHA1 hashes of all files read by the bundler]
 //  (for 'core' and 'apps', if a directory is given, you should
 //  monitor everything in the subtree under it minus the stuff that
 //  matches exclude, and if it doesn't exist yet, you should watch for
@@ -195,13 +196,10 @@ _.extend(PackageBundlingInfo.prototype, {
     self.files[where][rel_path] = true;
 
     var sourcePath = path.join(self.pkg.source_root, rel_path);
-    var fileContents = undefined;
-    if (self.bundle.fileHashes) {
-      // XXX for registered extensions, this hash has a race with the actual
-      // file contents re-read in the handler.
-      fileContents = fs.readFileSync(sourcePath);
-      self.bundle.fileHashes[sourcePath] = sha1(fileContents);
-    }
+    var fileContents = fs.readFileSync(sourcePath);
+    // XXX for registered extensions, this hash has a race with the actual
+    // file contents re-read in the handler.
+    self.bundle.inputFileHashes[sourcePath] = sha1(fileContents);
 
     var ext = files.findExtension(self.api.registered_extensions(), rel_path);
     // substr to remove the dot to translate between the with-dot world
@@ -216,9 +214,6 @@ _.extend(PackageBundlingInfo.prototype, {
     } else {
       // If we don't have an extension handler, serve this file
       // as a static resource.
-      if (fileContents === undefined) {
-        fileContents = fs.readFileSync(sourcePath);
-      }
       self.bundle.api.add_resource({
         type: "static",
         path: path.join(self.pkg.serve_root, rel_path),
@@ -284,9 +279,9 @@ var Bundle = function () {
   // list of errors encountered while bundling. array of string.
   self.errors = [];
 
-  // If the caller of bundle() wants them, a map from absolute path to SHA1 of
-  // all files read by this bundle. Used for dependency watching in the runner.
-  self.fileHashes = null;
+  // A map from absolute path to SHA1 of all files read by this bundle. Used for
+  // dependency watching in the runner.
+  self.inputFileHashes = {};
 
   // the API available from register_extension handlers
   self.api = {
@@ -420,9 +415,8 @@ _.extend(Bundle.prototype, {
     var self = this;
     var inst = self._get_bundling_info_for_package(pkg);
 
-    if (self.fileHashes) {
-      _.extend(self.fileHashes, pkg.metadataFileHashes);
-    }
+    // Get the hash of package.js or .meteor/packages.
+    _.extend(self.inputFileHashes, pkg.metadataFileHashes);
 
     if (from)
       from.using[pkg.id] = inst;
@@ -548,9 +542,7 @@ _.extend(Bundle.prototype, {
 
     var appHtmlPath = path.join(__dirname, "app.html.in");
     var template = fs.readFileSync(appHtmlPath);
-    if (self.fileHashes) {
-      self.fileHashes[appHtmlPath] = sha1(template);
-    }
+    self.inputFileHashes[appHtmlPath] = sha1(template);
     var f = require('handlebars').compile(template.toString());
     return f({
       scripts: self._clientUrlsFor('js'),
@@ -653,12 +645,9 @@ _.extend(Bundle.prototype, {
         _.each(copied, function (fs_relative_path) {
           var filepath = path.join(build_path, 'static', fs_relative_path);
           var contents = fs.readFileSync(filepath);
-          var hash = undefined;
-          if (self.fileHashes) {
-            hash = sha1(contents);
-            self.fileHashes[path.join(project_dir, public, fs_relative_path)]
-              = hash;
-          }
+          var hash = sha1(contents);
+          self.inputFileHashes[path.join(project_dir, 'public', fs_relative_path)]
+            = hash;
           addClientFileToManifest(fs_relative_path, contents, 'static', false, undefined, hash);
         });
       }
@@ -784,8 +773,7 @@ _.extend(Bundle.prototype, {
       }
     }
 
-    if (self.fileHashes)
-      dependencies_json.hashes = self.fileHashes;
+    dependencies_json.hashes = self.inputFileHashes;
 
     if (self.releaseStamp && self.releaseStamp !== 'none')
       app_json.release = self.releaseStamp;
@@ -860,9 +848,6 @@ exports.bundle = function (app_dir, output_path, options) {
     var bundle = new Bundle;
     bundle.releaseStamp = options.releaseStamp;
     bundle.packageSearchOptions = options.packageSearchOptions || {};
-    if (options.calculateFileHashes) {
-      bundle.fileHashes = {};
-    }
 
     // our release manifest is set, let's now load the app
     var app = packages.get_for_app(app_dir, ignore_files);

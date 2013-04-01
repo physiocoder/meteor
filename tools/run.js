@@ -17,6 +17,7 @@ var warehouse = require("./warehouse.js");
 
 var _ = require('underscore');
 var inFiber = require('./fiber-helpers.js').inFiber;
+var Future = require('fibers/future');
 
 ////////// Globals //////////
 //XXX: Refactor to not have globals anymore?
@@ -395,16 +396,20 @@ var DependencyWatcher = function (
   // are also race conditions where the bundler may calculate some hashes via a
   // separate read than the read that actually was used in bundling... but it's
   // close.
-  setTimeout(function() {
-    if (!self.on_change)
-      return;
+  setTimeout(inFiber(function() {
     for (var p in deps.hashes) {
-      if (bundler.sha1(fs.readFileSync(p)) !== deps.hashes[p]) {
+      // If we already fired (perhaps during the yield while reading a file), no
+      // need to continue.
+      if (!self.on_change)
+        return;
+      // It's OK to yield here, so use Future-wrapped fs.readFile instead of
+      // readFileSync.
+      if (bundler.sha1(Future.wrap(fs.readFile)(p)) !== deps.hashes[p]) {
         self._fire();
         return;
       }
     }
-  }, 1000);
+  }), 1000);
 };
 
 _.extend(DependencyWatcher.prototype, {
@@ -634,8 +639,7 @@ exports.run = function (context, options) {
     minify: options.minify,
     testPackages: options.testPackages,
     releaseStamp: context.releaseVersion,
-    packageSearchOptions: context.packageSearchOptions,
-    calculateFileHashes: true
+    packageSearchOptions: context.packageSearchOptions
   };
 
   var start_watching = function () {
