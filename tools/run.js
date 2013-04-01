@@ -404,7 +404,14 @@ var DependencyWatcher = function (
         return;
       // It's OK to yield here, so use Future-wrapped fs.readFile instead of
       // readFileSync.
-      if (bundler.sha1(Future.wrap(fs.readFile)(p)) !== deps.hashes[p]) {
+      try {
+        var contents = Future.wrap(fs.readFile)(p).wait();
+      } catch (e) {
+        // File was deleted? That sounds like we should fire!
+        self._fire();
+        return;
+      }
+      if (bundler.sha1(contents) !== deps.hashes[p]) {
         self._fire();
         return;
       }
