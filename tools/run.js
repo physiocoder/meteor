@@ -396,27 +396,15 @@ var DependencyWatcher = function (
   // are also race conditions where the bundler may calculate some hashes via a
   // separate read than the read that actually was used in bundling... but it's
   // close.
-  setTimeout(inFiber(function() {
-    for (var p in deps.hashes) {
-      // If we already fired (perhaps during the yield while reading a file), no
-      // need to continue.
-      if (!self.on_change)
-        return;
-      // It's OK to yield here, so use Future-wrapped fs.readFile instead of
-      // readFileSync.
-      try {
-        var contents = Future.wrap(fs.readFile)(p).wait();
-      } catch (e) {
-        // File was deleted? That sounds like we should fire!
-        self._fire();
-        return;
-      }
-      if (bundler.sha1(contents) !== deps.hashes[p]) {
-        self._fire();
-        return;
-      }
-    }
-  }), 1000);
+  setTimeout(function() {
+    _.each(deps.hashes, function (hash, filepath) {
+      fs.readFile(filepath, function (error, contents) {
+        // Fire if the file was deleted or changed contents.
+        if (error || bundler.sha1(contents) !== hash)
+          self._fire();
+      });
+    });
+  }, 1000);
 };
 
 _.extend(DependencyWatcher.prototype, {
