@@ -1,6 +1,12 @@
 
 ## vNEXT
 
+* Inside a `{{#each}}` over a cursor or array, you can now refer to the index in
+  the iteration with `{{INDEX}}`. Inside a `{{#each}}` over an object, you can
+  now refer to the key with `{{KEY}}`.
+
+Patches contributed by GitHub users ianserlin.
+
 ## v0.6.0
 
 * Meteor has a brand new distribution system! In this new system, code-named
