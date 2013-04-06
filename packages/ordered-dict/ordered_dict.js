@@ -149,20 +149,16 @@ _.extend(OrderedDict.prototype, {
   },
   prev: function (key) {
     var self = this;
-    if (self.has(key)) {
-      var elt = self.get(key);
-      if (elt.prev)
-        return elt.prev.key;
-    }
+    var elt = self._dict[self._k(key)];
+    if (elt && elt.prev)
+      return elt.prev.key;
     return null;
   },
   next: function (key) {
     var self = this;
-    if (self.has(key)) {
-      var elt = self.get(key);
-      if (elt.next)
-        return elt.next.key;
-    }
+    var elt = self._dict[self._k(key)];
+    if (elt && elt.next)
+      return elt.next.key;
     return null;
   },
   moveBefore: function (key, before) {

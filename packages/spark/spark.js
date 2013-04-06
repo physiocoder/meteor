@@ -917,7 +917,7 @@ Spark.list = function (cursor, itemFunc, elseFunc) {
     addedBefore: function (id, item, before) {
       var doc = EJSON.clone(item);
       doc._id = id;
-      var elt = {doc: doc, liveRange: null};
+      var elt = {doc: doc, liveRange: null, usedIndex: false};
       itemDict.putBefore(id, elt, before);
     }
   });
@@ -938,9 +938,21 @@ Spark.list = function (cursor, itemFunc, elseFunc) {
   // observeChanges. In theory, anything that implements observeChanges
   // could be passed to Spark.list. But meh.
   var transformedDoc = function (doc) {
+    doc = EJSON.clone(doc);
     if (cursor.getTransform && cursor.getTransform())
-      return cursor.getTransform()(EJSON.clone(doc));
+      doc = cursor.getTransform()(doc);
     return doc;
+  };
+
+  var renderItem = function (elt) {
+    var id = elt.doc._id;
+    var doc = transformedDoc(elt.doc);
+    elt.usedIndex = false;
+    doc._index = function () {
+      elt.usedIndex = true;
+      return itemDict.indexOf(id);
+    };
+    return itemFunc(doc);
   };
 
   // Render the initial contents. If we have a renderer, create a
@@ -953,7 +965,7 @@ Spark.list = function (cursor, itemFunc, elseFunc) {
   else {
     itemDict.forEach(function (elt) {
         html += maybeAnnotate(
-          itemFunc(transformedDoc(elt.doc)),
+          renderItem(elt),
           Spark._ANNOTATION_LIST_ITEM,
           function (range) {
             elt.liveRange = range;
@@ -1000,37 +1012,63 @@ Spark.list = function (cursor, itemFunc, elseFunc) {
     });
   };
 
+  var rerenderItemInPlace = function (elt) {
+    Spark.renderToRange(elt.liveRange, _.bind(renderItem, null, elt));
+  };
+
   // The DOM update callbacks.
   _.extend(callbacks, {
     addedBefore: function (id, fields, before) {
       later(function () {
         var doc = EJSON.clone(fields);
         doc._id = id;
-        var frag = Spark.render(_.bind(itemFunc, null, transformedDoc(doc)));
-        DomUtils.wrapFragmentForContainer(frag, outerRange.containerNode());
-        var range = makeRange(Spark._ANNOTATION_LIST_ITEM, frag);
+        var elt = {doc: doc, liveRange: null, usedIndex: false};
 
-        if (itemDict.empty()) {
+        // Update itemDict first so that the index change takes effect.
+        itemDict.putBefore(id, elt, before);
+
+        var frag = Spark.render(_.bind(renderItem, null, elt));
+        DomUtils.wrapFragmentForContainer(frag, outerRange.containerNode());
+        elt.liveRange = makeRange(Spark._ANNOTATION_LIST_ITEM, frag);
+
+        if (itemDict.size() === 1) {
           Spark.finalize(outerRange.replaceContents(frag));
         } else if (before === null) {
-          itemDict.lastValue().liveRange.insertAfter(frag);
+          itemDict.get(itemDict.prev(id)).liveRange.insertAfter(frag);
         } else {
           itemDict.get(before).liveRange.insertBefore(frag);
         }
-        itemDict.putBefore(id, {doc: doc, liveRange: range}, before);
+
+        // Re-render any items after us on the list which rendered their index.
+        for (var afterId = before; afterId !== null;
+             afterId = itemDict.next(afterId)) {
+          var afterElt = itemDict.get(afterId);
+          if (afterElt.usedIndex)
+            rerenderItemInPlace(afterElt);
+        }
       });
     },
 
     removed: function (id) {
       later(function () {
-        if (itemDict.first() === itemDict.last()) {
+        var afterId = itemDict.next(id);
+        var elt = itemDict.remove(id);
+
+        if (itemDict.empty()) {
           var frag = Spark.render(elseFunc);
           DomUtils.wrapFragmentForContainer(frag, outerRange.containerNode());
           Spark.finalize(outerRange.replaceContents(frag));
-        } else
-          Spark.finalize(itemDict.get(id).liveRange.extract());
-
-        itemDict.remove(id);
+        } else {
+          Spark.finalize(elt.liveRange.extract());
+          // Re-render any items after us on the list which rendered their
+          // index.
+          while (afterId !== null) {
+            var afterElt = itemDict.get(afterId);
+            if (afterElt.usedIndex)
+              rerenderItemInPlace(afterElt);
+            afterId = itemDict.next(afterId);
+          }
+        }
 
         notifyParentsRendered();
       });
@@ -1038,14 +1076,45 @@ Spark.list = function (cursor, itemFunc, elseFunc) {
 
     movedBefore: function (id, before) {
       later(function () {
-        var frag = itemDict.get(id).liveRange.extract();
+        if (id === before)
+          return;
+
+        var movedElt = itemDict.get(id);
+        var frag = movedElt.liveRange.extract();
         if (before === null) {
           itemDict.lastValue().liveRange.insertAfter(frag);
         }
         else {
           itemDict.get(before).liveRange.insertBefore(frag);
         }
+
+        // Re-render elements whose index has changed if necessary.
+        var afterId = itemDict.next(id);
+        // XXX could do something more clever to avoid calling indexOf (linear)
+        // twice.
+        var movingForward = (before === null ||
+                             itemDict.indexOf(id) < itemDict.indexOf(before));
         itemDict.moveBefore(id, before);
+        if (movingForward) {
+          // Moving forward. Move it, then process everything that was between
+          // id and before, and id itself.
+          while (afterId !== before) {
+            var afterElt = itemDict.get(afterId);
+            if (afterElt.usedIndex)
+              rerenderItemInPlace(afterElt);
+            afterId = itemDict.next(afterId);
+          }
+        } else {
+          // Moving backward. Move it, then process everything from id to that
+          // which was immediately before id.
+          for (var shiftedId = id; shiftedId !== afterId;
+               shiftedId = itemDict.next(shiftedId)) {
+            var shiftedElt = itemDict.get(shiftedId);
+            if (shiftedElt.usedIndex)
+              rerenderItemInPlace(shiftedElt);
+          }
+        }
+
         notifyParentsRendered();
       });
     },
@@ -1056,8 +1125,7 @@ Spark.list = function (cursor, itemFunc, elseFunc) {
         if (!elt)
           throw new Error("Unknown id for changed: " + id);
         applyChanges(elt.doc, fields);
-        Spark.renderToRange(elt.liveRange,
-                            _.bind(itemFunc, null, transformedDoc(elt.doc)));
+        rerenderItemInPlace(elt);
       });
     }
   });
