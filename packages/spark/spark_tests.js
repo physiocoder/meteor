@@ -244,7 +244,8 @@ Tinytest.add("spark - replace tag contents", function (test) {
     this.render(function () {
       return "<select id='morphing' name='fred'>" +
         Spark.list(c.find({}, {sort: ['value']}), function (doc) {
-          return '<option value="' + doc.value + '">' + doc.name + '</option>';
+          return '<option value="' + doc.value + '">' + doc.INDEX() +
+            ': ' + doc.name + '</option>';
         }) +
         "</select>";
     });
@@ -255,37 +256,93 @@ Tinytest.add("spark - replace tag contents", function (test) {
 
     test.equal(furtherCanon(this.div.html()),
                '<select id="morphing" name="fred">' +
-               '<option value="1">Hamburger</option>' +
-               '<option value="2">Cheeseburger</option>' +
+               '<option value="1">0: Hamburger</option>' +
+               '<option value="2">1: Cheeseburger</option>' +
                '</select>');
+    // Add at end.
     c.insert({name: 'Chicken Snickers', value: 8});
     Deps.flush();
     test.equal(furtherCanon(this.div.html()),
                '<select id="morphing" name="fred">' +
-               '<option value="1">Hamburger</option>' +
-               '<option value="2">Cheeseburger</option>' +
-               '<option value="8">Chicken Snickers</option>' +
+               '<option value="1">0: Hamburger</option>' +
+               '<option value="2">1: Cheeseburger</option>' +
+               '<option value="8">2: Chicken Snickers</option>' +
                '</select>');
-    c.remove({value: 1});
-    c.remove({value: 2});
+    // Add in middle.
+    c.insert({name: 'Middle', value: 5});
     Deps.flush();
     test.equal(furtherCanon(this.div.html()),
                '<select id="morphing" name="fred">' +
-               '<option value="8">Chicken Snickers</option>' +
+               '<option value="1">0: Hamburger</option>' +
+               '<option value="2">1: Cheeseburger</option>' +
+               '<option value="5">2: Middle</option>' +
+               '<option value="8">3: Chicken Snickers</option>' +
                '</select>');
+    // Delete in middle.
+    c.remove({value: 2});
+    c.remove({value: 5});
+    Deps.flush();
+    test.equal(furtherCanon(this.div.html()),
+               '<select id="morphing" name="fred">' +
+               '<option value="1">0: Hamburger</option>' +
+               '<option value="8">1: Chicken Snickers</option>' +
+               '</select>');
+    // Delete in front.
+    c.remove({value: 1});
+    Deps.flush();
+    test.equal(furtherCanon(this.div.html()),
+               '<select id="morphing" name="fred">' +
+               '<option value="8">0: Chicken Snickers</option>' +
+               '</select>');
+    // Delete all.
     c.remove({});
     Deps.flush();
     test.equal(furtherCanon(this.div.html()),
                '<select id="morphing" name="fred">' +
                '<!---->' +
                '</select>');
-    c.insert({name: 'Hamburger', value: 1});
-    c.insert({name: 'Cheeseburger', value: 2});
+    // Insert again.
+    c.insert({name: 'Hamburger', value: 10});
+    c.insert({name: 'Cheeseburger', value: 20});
+    c.insert({name: 'Threesburger', value: 30});
+    c.insert({name: 'Foursburger', value: 40});
     Deps.flush();
     test.equal(furtherCanon(this.div.html()),
                '<select id="morphing" name="fred">' +
-               '<option value="1">Hamburger</option>' +
-               '<option value="2">Cheeseburger</option>' +
+               '<option value="10">0: Hamburger</option>' +
+               '<option value="20">1: Cheeseburger</option>' +
+               '<option value="30">2: Threesburger</option>' +
+               '<option value="40">3: Foursburger</option>' +
+               '</select>');
+    // Move forward.
+    c.update({name: "Hamburger"}, {$set: {value: 35}});
+    Deps.flush();
+    test.equal(furtherCanon(this.div.html()),
+               '<select id="morphing" name="fred">' +
+               '<option value="20">0: Cheeseburger</option>' +
+               '<option value="30">1: Threesburger</option>' +
+               '<option value="35">2: Hamburger</option>' +
+               '<option value="40">3: Foursburger</option>' +
+               '</select>');
+    // Move back.
+    c.update({name: "Hamburger"}, {$set: {value: 10}});
+    Deps.flush();
+    test.equal(furtherCanon(this.div.html()),
+               '<select id="morphing" name="fred">' +
+               '<option value="10">0: Hamburger</option>' +
+               '<option value="20">1: Cheeseburger</option>' +
+               '<option value="30">2: Threesburger</option>' +
+               '<option value="40">3: Foursburger</option>' +
+               '</select>');
+    // Move to end.
+    c.update({name: "Cheeseburger"}, {$set: {value: 50}});
+    Deps.flush();
+    test.equal(furtherCanon(this.div.html()),
+               '<select id="morphing" name="fred">' +
+               '<option value="10">0: Hamburger</option>' +
+               '<option value="30">1: Threesburger</option>' +
+               '<option value="40">2: Foursburger</option>' +
+               '<option value="50">3: Cheeseburger</option>' +
                '</select>');
   });
 

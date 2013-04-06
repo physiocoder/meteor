@@ -34,22 +34,22 @@ Handlebars._default_helpers = {
       return options.fn(data);
   },
   'each': function (data, options) {
-    var parentData = this,
-      hasValues = false,
-      key = _.isArray(data) ? '_index' : '_key',
-      branches = _.map(data, function(x, i) {
-        hasValues = true;
-        // enable eachWithIndex functional parity with handlebars
-        if(x){ x[key] = i; }
-        // infer a branch key from the data
-        var branch = ((x && x._id) || (typeof x === 'string' ? x : null) ||
-                      Spark.UNIQUE_LABEL);
-        return Spark.labelBranch(branch, function() {
-          return options.fn(x);
-        });
-      }).join('');
-    
-    return hasValues && branches || Spark.labelBranch('else', function () {
+    var parentData = this;
+    var key = _.isArray(data) ? 'INDEX' : 'KEY';
+    var branches = _.map(data, function (x, i) {
+      if (x)
+        x[key] = i;
+      // infer a branch key from the data
+      var branch = ((x && x._id) || (typeof x === 'string' ? x : null) ||
+                    Spark.UNIQUE_LABEL);
+      return Spark.labelBranch(branch, function() {
+        return options.fn(x);
+      });
+    });
+
+    if (!_.isEmpty(branches))
+      return branches.join('');
+    return Spark.labelBranch('else', function () {
       return options.inverse(parentData);
     });
   },

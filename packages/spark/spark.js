@@ -948,7 +948,7 @@ Spark.list = function (cursor, itemFunc, elseFunc) {
     var id = elt.doc._id;
     var doc = transformedDoc(elt.doc);
     elt.usedIndex = false;
-    doc._index = function () {
+    doc.INDEX = function () {
       elt.usedIndex = true;
       return itemDict.indexOf(id);
     };
