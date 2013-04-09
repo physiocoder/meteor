@@ -3,8 +3,12 @@ Package.describe({
   internal: true
 });
 
-Npm.depends({sockjs: "0.3.4",
-             websocket: "1.0.7"});
+Npm.depends({
+  // Based on 0.3.5. Fixes DDP version negotiation (our tests would busy cycle
+  // until they finally managed to get the server's closing message).
+  // See https://github.com/sockjs/sockjs-node/pull/117
+  sockjs: "https://github.com/glasser/sockjs-node/tarball/fcd8dd328de40dc3d127d40c9ebf400759bd501f",
+  websocket: "1.0.7"});
 
 Package.on_use(function (api) {
   api.use(['random', 'ejson', 'json', 'underscore', 'deps', 'logging'],

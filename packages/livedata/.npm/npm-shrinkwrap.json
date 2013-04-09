@@ -1,8 +1,9 @@
 {
   "dependencies": {
     "sockjs": {
-      "version": "0.3.4",
-      "from": "sockjs@0.3.4",
+      "version": "0.3.5",
+      "from": "https://github.com/glasser/sockjs-node/tarball/fcd8dd328de40dc3d127d40c9ebf400759bd501f",
+      "resolved": "https://github.com/glasser/sockjs-node/tarball/fcd8dd328de40dc3d127d40c9ebf400759bd501f",
       "dependencies": {
         "node-uuid": {
           "version": "1.3.3",
