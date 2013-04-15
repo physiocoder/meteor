@@ -161,7 +161,7 @@ assert.doesNotThrow(function () {
   // just remove all of the .npm directory)
   var bareExecFileSync = meteorNpm._execFileSync;
   meteorNpm._execFileSync = function(file, args, opts) {
-    if (args[0] === 'install' && args[1])
+    if (args.length > 2 && args[0] === 'install' && args[1] === '--force')
       assert.fail("shouldn't be installing specific npm packages: " + args[1]);
     return bareExecFileSync(file, args, opts);
   };
