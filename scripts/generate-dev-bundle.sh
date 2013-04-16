@@ -74,7 +74,7 @@ git clone git://github.com/joyent/node.git
 cd node
 # When upgrading node versions, also update the values of MIN_NODE_VERSION at
 # the top of app/meteor/meteor.js and app/server/server.js.
-git checkout v0.10.3
+git checkout v0.10.4
 
 ./configure --prefix="$DIR"
 make -j4
@@ -95,7 +95,7 @@ which npm
 # you update version numbers.
 
 cd "$DIR/lib/node_modules"
-npm install connect@1.9.2 # not 2.x yet. sockjs doesn't work w/ new connect
+npm install connect@2.7.6
 npm install optimist@0.3.5
 npm install semver@1.1.0
 npm install handlebars@1.0.7
