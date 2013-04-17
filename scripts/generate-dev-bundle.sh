@@ -95,7 +95,7 @@ which npm
 # you update version numbers.
 
 cd "$DIR/lib/node_modules"
-npm install connect@2.7.6
+npm install connect@1.9.2 # not 2.x yet. sockjs doesn't work w/ new connect
 npm install optimist@0.3.5
 npm install semver@1.1.0
 npm install handlebars@1.0.7
@@ -103,7 +103,7 @@ npm install clean-css@0.8.3
 npm install useragent@2.0.1
 npm install request@2.12.0
 npm install keypress@0.1.0
-npm install http-proxy@0.8.5
+npm install http-proxy@0.10.1
 npm install underscore@1.4.4
 npm install fstream@0.1.21
 npm install tar@0.1.14
