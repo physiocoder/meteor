@@ -305,15 +305,23 @@ _.extend(ArgumentChecker.prototype, {
   }
 });
 
+var _jsKeywords = ["do", "if", "in", "for", "let", "new", "try", "var", "case",
+  "else", "enum", "eval", "false", "null", "this", "true", "void", "with",
+  "break", "catch", "class", "const", "super", "throw", "while", "yield",
+  "delete", "export", "import", "public", "return", "static", "switch",
+  "typeof", "default", "extends", "finally", "package", "private", "continue",
+  "debugger", "function", "arguments", "interface", "protected", "implements",
+  "instanceof"];
+
 // Assumes the base of path is already escaped properly
 // returns key + base
 var _prependPath = function (key, base) {
   if ((typeof key) === "number" || key.match(/^[0-9]+$/))
     key = "[" + key + "]";
-  else if (!key.match(/^[a-z]\w*$/i))
+  else if (!key.match(/^[a-z_$][0-9a-z_$]*$/i) && !_.contains(_jsKeywords, key))
     key = JSON.stringify([key]);
 
-  if (base && base[0] !== "[" && key && _.last(key) !== "]")
+  if (base && base[0] !== "[")
     return key + '.' + base;
   return key + base;
 };
