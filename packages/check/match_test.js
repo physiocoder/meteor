@@ -250,5 +250,8 @@ Tinytest.add("check - Match error path", function (test) {
           [{ foo: "asdf" }]],
          [[{ foo: 123 }]]],
         [[[{ foo: String }]]], "[1][0][0].foo");
+
+  // JS keyword
+  match({ "return": 0 }, { "return": String }, "[\"return\"]");
 });
 

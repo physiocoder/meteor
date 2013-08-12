@@ -318,7 +318,7 @@ var _jsKeywords = ["do", "if", "in", "for", "let", "new", "try", "var", "case",
 var _prependPath = function (key, base) {
   if ((typeof key) === "number" || key.match(/^[0-9]+$/))
     key = "[" + key + "]";
-  else if (!key.match(/^[a-z_$][0-9a-z_$]*$/i) && !_.contains(_jsKeywords, key))
+  else if (!key.match(/^[a-z_$][0-9a-z_$]*$/i) || _.contains(_jsKeywords, key))
     key = JSON.stringify([key]);
 
   if (base && base[0] !== "[")
