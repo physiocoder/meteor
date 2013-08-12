@@ -162,9 +162,7 @@ var checkSubtree = function (value, pattern) {
         checkSubtree(valueElement, pattern[0]);
       } catch (err) {
         if (err instanceof Match.Error) {
-          if (err.path && err.path[0] !== '[')
-            err.path = "." + err.path;
-          err.path = "[" + index + "]" + err.path;
+          err.path = _prependPath(index, err.path);
         }
         throw err;
       }
@@ -251,11 +249,8 @@ var checkSubtree = function (value, pattern) {
           throw new Match.Error("Unknown key");
       }
     } catch (err) {
-      if (err instanceof Match.Error) {
-        if (err.path && err.path[0] !== "[")
-          err.path = "." + err.path;
-        err.path = key + err.path;
-      }
+      if (err instanceof Match.Error)
+        err.path = _prependPath(key, err.path);
       throw err;
     }
   });
@@ -309,3 +304,17 @@ _.extend(ArgumentChecker.prototype, {
                       self.description);
   }
 });
+
+// Assumes the base of path is already escaped properly
+// returns key + base
+var _prependPath = function (key, base) {
+  if ((typeof key) === "number" || key.match(/^[0-9]+$/))
+    key = "[" + key + "]";
+  else if (!key.match(/^[a-z]\w*$/i))
+    key = JSON.stringify([key]);
+
+  if (base && base[0] !== "[" && key && _.last(key) !== "]")
+    return key + '.' + base;
+  return key + base;
+};
+
