@@ -301,7 +301,8 @@ _.extend(ArgumentChecker.prototype, {
     var self = this;
     if (!_.isEmpty(self.args))
       throw new Error("Did not check() all arguments during " +
-                      self.description);
+                      self.description + "; Unchecked arguments: " +
+                      util.format.apply(util, self.args));
   }
 });
 
