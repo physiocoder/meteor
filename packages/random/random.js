@@ -137,15 +137,24 @@ RandomGenerator.prototype.hexString = function (digits) {
     return hexDigits.join('');
   }
 };
-RandomGenerator.prototype.id = function () {
+
+RandomGenerator.prototype.id = function (numDigits) {
   var digits = [];
   var self = this;
+  if (numDigits === undefined)
+    numDigits = 17;
   // Length of 17 preserves around 96 bits of entropy, which is the
   // amount of state in the Alea PRNG.
-  for (var i = 0; i < 17; i++) {
+  for (var i = 0; i < numDigits; i++) {
     digits[i] = self.choice(UNMISTAKABLE_CHARS);
   }
   return digits.join("");
+};
+
+// A random id with about 128 bits of entropy. Use for security-critical
+// random strings like login tokens.
+RandomGenerator.prototype.longId = function () {
+  return this.id(24);
 };
 
 RandomGenerator.prototype.choice = function (arrayOrString) {

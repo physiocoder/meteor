@@ -26,4 +26,8 @@ Tinytest.add('random - format', function (test) {
   var frac = Random.fraction();
   test.isTrue(frac < 1.0);
   test.isTrue(frac >= 0.0);
+
+  // 24 characters chosen from a list of 55 characters is at least 128
+  // bits of entropy.
+  test.isTrue(Random.longId().length >= 24);
 });

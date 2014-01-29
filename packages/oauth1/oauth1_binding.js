@@ -4,7 +4,7 @@ var querystring = Npm.require("querystring");
 // An OAuth1 wrapper around http calls which helps get tokens and
 // takes care of HTTP headers
 //
-// @param config {Object} 
+// @param config {Object}
 //   - consumerKey (String): oauth consumer key
 //   - secret (String): oauth consumer secret
 // @param urls {Object}
@@ -88,7 +88,7 @@ OAuth1Binding.prototype._buildHeader = function(headers) {
   var self = this;
   return _.extend({
     oauth_consumer_key: self._config.consumerKey,
-    oauth_nonce: Random.id().replace(/\W/g, ''),
+    oauth_nonce: Random.longId().replace(/\W/g, ''),
     oauth_signature_method: 'HMAC-SHA1',
     oauth_timestamp: (new Date().valueOf()/1000).toFixed().toString(),
     oauth_version: '1.0'
