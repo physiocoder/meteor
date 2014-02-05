@@ -20,7 +20,7 @@ Google.requestCredential = function (options, credentialRequestCompleteCallback)
     return;
   }
 
-  var credentialToken = Random.longId();
+  var credentialToken = Random.id(128);
 
   // always need this to get user id from google.
   var requiredScope = ['https://www.googleapis.com/auth/userinfo.profile'];

@@ -27,7 +27,12 @@ Tinytest.add('random - format', function (test) {
   test.isTrue(frac < 1.0);
   test.isTrue(frac >= 0.0);
 
-  // 24 characters chosen from a list of 55 characters is at least 128
+  // 23 characters chosen from a list of 55 characters is at least 128
   // bits of entropy.
-  test.isTrue(Random.longId().length >= 24);
+  test.isTrue(Random.id(128).length >= 23);
+});
+
+Tinytest.add('random - length of random id provides enough entropy', function (test) {
+  test.equal(stringLenForEntropy(96, 55), 17);
+  test.equal(stringLenForEntropy(128, 55), 23);
 });

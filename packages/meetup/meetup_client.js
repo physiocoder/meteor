@@ -16,7 +16,7 @@ Meetup.requestCredential = function (options, credentialRequestCompleteCallback)
     credentialRequestCompleteCallback && credentialRequestCompleteCallback(new ServiceConfiguration.ConfigError("Service not configured"));
     return;
   }
-  var credentialToken = Random.longId();
+  var credentialToken = Random.id(128);
 
   var scope = (options && options.requestPermissions) || [];
   var flatScope = _.map(scope, encodeURIComponent).join('+');

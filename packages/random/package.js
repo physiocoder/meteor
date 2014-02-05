@@ -6,6 +6,7 @@ Package.describe({
 Package.on_use(function (api) {
   api.use('underscore');
   api.export('Random');
+  api.export('stringLenForEntropy', { testOnly: true });
   api.add_files('random.js');
   api.add_files('deprecated.js');
 });

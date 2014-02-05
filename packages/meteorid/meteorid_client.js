@@ -14,7 +14,7 @@ MeteorId.requestCredential = function (credentialRequestCompleteCallback) {
     return;
   }
 
-  var credentialToken = Random.longId();
+  var credentialToken = Random.id(128);
 
   var loginUrl =
         METEORID_URL + "/oauth2/authorize?" +

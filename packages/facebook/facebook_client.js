@@ -19,7 +19,7 @@ Facebook.requestCredential = function (options, credentialRequestCompleteCallbac
     return;
   }
 
-  var credentialToken = Random.longId();
+  var credentialToken = Random.id(128);
   var mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry/i.test(navigator.userAgent);
   var display = mobile ? 'touch' : 'popup';
 
