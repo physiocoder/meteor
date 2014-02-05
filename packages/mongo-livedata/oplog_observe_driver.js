@@ -19,8 +19,16 @@ OplogObserveDriver = function (options) {
   self._cursorDescription = options.cursorDescription;
   self._mongoHandle = options.mongoHandle;
   self._multiplexer = options.multiplexer;
-  if (options.ordered)
-    throw Error("OplogObserveDriver only supports unordered observeChanges");
+
+  if (options.ordered) {
+    // XXX replace with doubly-heaps and shit once we get these working
+    self._unpublishedBuffer = new DummyStructure;
+    // We need something that can find Max value in addition to IdMap interface
+    self._published = new DummyStructure;
+  } else {
+    self._unpublishedBuffer = null;
+    self._published = new LocalCollection._IdMap;
+  }
 
   self._stopped = false;
   self._stopHandles = [];
@@ -30,7 +38,6 @@ OplogObserveDriver = function (options) {
 
   self._registerPhaseChange(PHASE.QUERYING);
 
-  self._published = new LocalCollection._IdMap;
   var selector = self._cursorDescription.selector;
   self._matcher = options.matcher;
   var projection = self._cursorDescription.options.fields || {};
@@ -111,9 +118,11 @@ _.extend(OplogObserveDriver.prototype, {
     var self = this;
     var id = doc._id;
     var fields = _.clone(doc);
+    // xcxc don't delete _id? why are we doing it?
     delete fields._id;
     if (self._published.has(id))
       throw Error("tried to add something already published " + id);
+    // xcxc possibly push something out to _unpublishedBuffer
     self._published.set(id, self._sharedProjectionFn(fields));
     self._multiplexer.added(id, self._projectionFn(fields));
   },
@@ -122,6 +131,7 @@ _.extend(OplogObserveDriver.prototype, {
     if (!self._published.has(id))
       throw Error("tried to remove something unpublished " + id);
     self._published.remove(id);
+    // xcxc push it into _unpublishedBuffer
     self._multiplexer.removed(id);
   },
   _handleDoc: function (id, newDoc, mustMatchNow) {
@@ -145,6 +155,8 @@ _.extend(OplogObserveDriver.prototype, {
       if (!oldDoc)
         throw Error("thought that " + id + " was there!");
       delete newDoc._id;
+      // xcxc possibly is pushed out to _unpublishedBuffer and something is
+      // pulled in from _unpublishedBuffer
       self._published.set(id, self._sharedProjectionFn(newDoc));
       var changed = LocalCollection._makeChangedFields(_.clone(newDoc), oldDoc);
       changed = self._projectionFn(changed);
@@ -235,6 +247,7 @@ _.extend(OplogObserveDriver.prototype, {
     if (op.op === 'd') {
       if (self._published.has(id))
         self._remove(id);
+        // xcxc possibly pull something in from _unpublishedBuffer
     } else if (op.op === 'i') {
       if (self._published.has(id))
         throw new Error("insert found for already-existing ID");
@@ -411,6 +424,7 @@ _.extend(OplogObserveDriver.prototype, {
     // First remove anything that's gone. Be careful not to modify
     // self._published while iterating over it.
     var idsToRemove = [];
+    // xcxc how is _unpublishedBuffer should behave here?
     self._published.forEach(function (doc, id) {
       if (!newResults.has(id))
         idsToRemove.push(id);
@@ -451,6 +465,7 @@ _.extend(OplogObserveDriver.prototype, {
 
     // Proactively drop references to potentially big things.
     self._published = null;
+    // xcxc proactively drop the _unpublishedBuffer as well?
     self._needToFetch = null;
     self._currentlyFetching = null;
     self._oplogEntryHandle = null;
