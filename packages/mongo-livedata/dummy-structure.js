@@ -20,25 +20,25 @@ DummyStructure.prototype.clone = function () {
   return clone;
 };
 
-DummyStructure.prototype.minElement = function () {
+DummyStructure.prototype.minElementId = function () {
   var self = this;
-  var minElement = undefined;
+  var minElementId = null;
   self.idMap.forEach(function (value, key) {
-    if (minElement === undefined)
-      minElement = value;
-    else if (self.comparator(value, minElement) < 0)
-      minElement = value;
+    if (minElement === null)
+      minElementId = key;
+    else if (self.comparator(value, self.idMap.get(minElementId)) < 0)
+      minElementId = key;
   });
 
-  return minElement;
+  return minElementId;
 };
 
-DummyStructure.prototype.maxElement = function () {
+DummyStructure.prototype.maxElementId = function () {
   var self = this;
   var comparator = self.comparator;
   self.comparator = function (a, b) { return -comparator(a, b); };
-  var maxElement = self.minElement();
+  var maxElementId = self.minElementId();
   self.comparator = comparator;
-  return maxElement;
+  return maxElementId;
 };
 
