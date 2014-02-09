@@ -118,10 +118,42 @@ OplogObserveDriver = function (options) {
 };
 
 _.extend(OplogObserveDriver.prototype, {
+  _addPublished: function (id, doc) {
+    self._published.set(id, self._sharedProjectionFn(fields));
+    self._multiplexer.added(id, self._projectionFn(fields));
+    // xcxc check if it pushes something out to unpublished buffer, do it
+  },
+  _removePublished: function (id) {
+    self._published.remove(id);
+    self._multiplexer.removed(id);
+    if (!self._unpublishedBuffer)
+      return;
+    // xcxc size on heaps should be cached to O(1)
+    // XXX this check can be improved to _published.size === limit-1 and unpublished is non empty
+    if (self._published.size < self._cursorDescription.limit) {
+      // xcxc if buffer is empty, fill it up unless it is unrefillable
+      if (! self._unpublishedBuffer.size) {
+        // xcxc try to fill it up
+        // possibly return if unrefillable
+      }
+
+      // xcxc rewrite this block in terms of _addBuffered, _removeBuffered
+      var newDocId = self._unpublishedBuffer.minElementId();
+      var newDoc = self._unpublishedBuffer.get(newDocId);
+      self._unpublishedBuffer.remove(newDocId);
+      self._published.add(newDocId, newDoc);
+      self._multiplexer.added(newDocId, self._projectionFn(newDoc));
+    }
+  },
+  _addBuffered: function (id, doc) {
+    self._unpublishedBuffer.add(id, self._sharedProjectionFn(fields));
+    // xcxc check if it pushes something out to unpublished
+  },
+  _removeBuffered: function (id) {},
   // Called when a document has joined the "Matching" results set.
   // Takes responsibility of keeping _unpublishedBuffer in sync with _published
   // and the effect of limit enforced.
-  _add: function (doc) {
+  _addMatching: function (doc) {
     var self = this;
     var id = doc._id;
     var fields = _.clone(doc);
@@ -131,45 +163,32 @@ _.extend(OplogObserveDriver.prototype, {
     if (self._unpublishedBuffer && self._unpublishedBuffer.has(id))
       throw Error("tried to add something already existed in buffer " + id); // xcxc error msg
 
-    if (/*xcxc should be in the bounds of limit*/) {
-      self._published.set(id, self._sharedProjectionFn(fields));
-      self._multiplexer.added(id, self._projectionFn(fields));
-      // xcxc check if it pushes something out to unpublished buffer, do it
-    } else if (self._unpublishedBuffer && /* xcxc should be in the bounds of unpublished */) {
-      self._unpublishedBuffer.add(id, self._sharedProjectionFn(fields));
+    var limit = self._cursorDescription.limit;
+    var comparator = self._comparator;
+    var maxPublished = self._published.get(self._published.getMaximumId());
+    var maxBuffered = self._unpublishedBuffer.get(self._unpublishedBuffer.getMaximumId());
+    // The query is unlimited or didn't publish enough documents yet or the new
+    // document would fit into published set pushing the maximum element out,
+    // then we need to publish the doc.
+    // Otherwise we might need to buffer it (only in case of limited query).
+    if (!limit || self._published.size < limit || comparator(maxPublished, doc) === 1) {
+      self._addPublished(id, doc);
+    } else if (self._unpublishedBuffer.size < limit || comparator(maxBuffered, doc) === 1) {
+      self._addBuffered(id, doc);
     }
   },
   // Called when a document leaves the "Matching" results set.
   // Takes responsibility of keeping _unpublishedBuffer in sync with _published
   // and the effect of limit enforced.
-  _remove: function (id) {
+  _removeMatching: function (id) {
     var self = this;
     if (!self._published.has(id) && !self._unpublishedBuffer)
       throw Error("tried to remove something unpublished " + id); // xcxc fix this error msg
 
     if (self._published.has(id)) {
-      self._published.remove(id);
-      self._multiplexer.removed(id);
-
-      if (!self._unpublishedBuffer)
-        return;
-      // xcxc size on heaps should be cached to O(1)
-      // XXX this check can be improved to _published.size === limit-1 and unpublished is non empty
-      if (self._published.size < self._cursorDescription.limit) {
-        // xcxc if buffer is empty, fill it up unless it is unrefillable
-        if (! self._unpublishedBuffer.size) {
-          // xcxc try to fill it up
-          // possibly return if unrefillable
-        }
-
-        var newDocId = self._unpublishedBuffer.minElementId();
-        var newDoc = self._unpublishedBuffer.get(newDocId);
-        self._unpublishedBuffer.remove(newDocId);
-        self._published.add(newDocId, newDoc);
-        self._multiplexer.added(newDocId, self._projectionFn(newDoc));
-      }
+      self._removePublished(id);
     } else if (self._unpublishedBuffer.has(id)) {
-      self._unpublishedBuffer.remove(id);
+      self._removeBuffered(id);
     }
   },
   _handleDoc: function (id, newDoc, mustMatchNow) {
