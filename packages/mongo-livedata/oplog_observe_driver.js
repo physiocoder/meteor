@@ -327,17 +327,17 @@ _.extend(OplogObserveDriver.prototype, {
     }
 
     if (op.op === 'd') {
-      if (self._published.has(id))
-        self._remove(id);
-        // xcxc possibly pull something in from _unpublishedBuffer
+      if (self._published.has(id) || (self._limit && self._unpublishedBuffer.has(id)))
+        self._removeMatching(id);
     } else if (op.op === 'i') {
+      // xcxc what if buffer has it?
       if (self._published.has(id))
         throw new Error("insert found for already-existing ID");
 
       // XXX what if selector yields?  for now it can't but later it could have
       // $where
       if (self._matcher.documentMatches(op.o).result)
-        self._add(op.o);
+        self._addMatching(op.o);
     } else if (op.op === 'u') {
       // Is this a modifier ($set/$unset, which may require us to poll the
       // database to figure out if the whole document matches the selector) or a
@@ -380,8 +380,9 @@ _.extend(OplogObserveDriver.prototype, {
 
     var initialCursor = self._cursorForQuery();
     initialCursor.forEach(function (initialDoc) {
-      self._add(initialDoc);
+      self._addPublished(initialDoc);
     });
+    // xcxc fill up the buffer as well
     if (self._stopped)
       throw new Error("oplog stopped quite early");
     // Allow observeChanges calls to return. (After this, it's possible for
@@ -510,12 +511,13 @@ _.extend(OplogObserveDriver.prototype, {
     // self._published while iterating over it.
     var idsToRemove = [];
     // xcxc how is _unpublishedBuffer should behave here?
+    // xcxc proactively refill buffer as well
     self._published.forEach(function (doc, id) {
       if (!newResults.has(id))
         idsToRemove.push(id);
     });
     _.each(idsToRemove, function (id) {
-      self._remove(id);
+      self._removePublished(id);
     });
 
     // Now do adds and changes.
