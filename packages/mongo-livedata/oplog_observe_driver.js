@@ -22,16 +22,14 @@ OplogObserveDriver = function (options) {
 
   if (options.ordered) {
     // XXX replace with doubly-heaps and shit once we get these working
-    // XXX what if we don't have sorter? xcxc
     var comparator = self._cursorDescription.sorter.getComparator();
     self._limit = self._cursorDescription.limit;
     self._comparator = comparator;
-    // xcxc should immediately load this buffer with stuff or do it in QUERYING
     self._unpublishedBuffer = new DummyStructure(comparator);
     // We need something that can find Max value in addition to IdMap interface
     self._published = new DummyStructure(comparator);
   } else {
-    self._limit = null;
+    self._limit = 0;
     self._comparator = null;
     self._unpublishedBuffer = null;
     self._published = new LocalCollection._IdMap;
@@ -378,11 +376,17 @@ _.extend(OplogObserveDriver.prototype, {
     if (self._stopped)
       throw new Error("oplog stopped surprisingly early");
 
-    var initialCursor = self._cursorForQuery();
+    // Query 2x documents as the half excluded from the original query will go
+    // into unpublished buffer to reduce additional Mongo lookups in cases when
+    // documents are removed from the published set and need a replacement.
+    // XXX needs more thought on non-zero skip
+    // XXX "2" here is a "magic number"
+    var initialCursor = self._cursorForQuery({ limit: self._limit * 2 });
     initialCursor.forEach(function (initialDoc) {
-      self._addPublished(initialDoc);
+      // self._addMatching knows how to correctly separate documents into the
+      // published set and the buffer.
+      self._addMatching(initialDoc);
     });
-    // xcxc fill up the buffer as well
     if (self._stopped)
       throw new Error("oplog stopped quite early");
     // Allow observeChanges calls to return. (After this, it's possible for
@@ -478,7 +482,7 @@ _.extend(OplogObserveDriver.prototype, {
     }
   },
 
-  _cursorForQuery: function () {
+  _cursorForQuery: function (optionsOverwrite) {
     var self = this;
 
     // The query we run is almost the same as the cursor we are observing, with
@@ -487,6 +491,11 @@ _.extend(OplogObserveDriver.prototype, {
     // "shared" projection). And we don't want to apply any transform in the
     // cursor, because observeChanges shouldn't use the transform.
     var options = _.clone(self._cursorDescription.options);
+
+    // Allow the caller to modify the options. Useful to specify different skip
+    // and limit values.
+    _.extend(options, optionsOverwrite);
+
     options.fields = self._sharedProjection;
     delete options.transform;
     // We are NOT deep cloning fields or selector here, which should be OK.
@@ -591,7 +600,7 @@ OplogObserveDriver.cursorSupported = function (cursorDescription, matcher) {
   // This option (which are mostly used for sorted cursors) require us to figure
   // out where a given document fits in an order to know if it's included or
   // not, and we don't track that information when doing oplog tailing.
-  if (options.limit || options.skip) return false;
+  if (options.limit && (options.skip || !options.sorter)) return false;
 
   // If a fields projection option is given check if it is supported by
   // minimongo (some operators are not supported).
