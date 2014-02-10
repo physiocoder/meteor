@@ -122,7 +122,26 @@ _.extend(OplogObserveDriver.prototype, {
   _addPublished: function (id, doc) {
     self._published.set(id, self._sharedProjectionFn(fields));
     self._multiplexer.added(id, self._projectionFn(fields));
-    // xcxc check if it pushes something out to unpublished buffer, do it
+
+    // After adding this document, the published set might be overflowed
+    // (exceeding capacity specified by limit). If so, push the maximum element
+    // to the buffer, we might want to save it in memory to reduce the amount of
+    // Mongo lookups in the future.
+    if (self._limit && self._published.size > self._limit) {
+      // XXX in theory the size of published is no more than limit+1
+      if (self._published.size !== self._limit + 1) {
+        // xcxc better error message
+        throw new Error("After adding to published, " +
+                        (self._limit - self._published.size) +
+                        " documents are overflowing the set");
+      }
+
+      var overflowingDocId = self._published.getMaximumId();
+      var overflowingDoc = self._published.get(overflowingDocId);
+      self._published.remove(overflowingDocId);
+      self._multiplexer.removed(overflowingDocId);
+      self._addBuffered(overflowingDocId, overflowingDoc);
+    }
   },
   _removePublished: function (id) {
     self._published.remove(id);
