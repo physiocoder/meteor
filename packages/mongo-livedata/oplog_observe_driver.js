@@ -151,14 +151,16 @@ _.extend(OplogObserveDriver.prototype, {
     // xcxc size on heaps should be cached to O(1)
     // XXX this check can be improved to _published.size === limit-1 and unpublished is non empty
     if (self._published.size < self._cursorDescription.limit) {
-      // xcxc the unpublished buffer should be nonempty if it is possible as we
-      // set the rule "buffer is never filled lazily"
-      // xcxc rewrite this block in terms of _addBuffered, _removeBuffered
+      // The unpublished buffer is empty iff published contains the whole
+      // matching set, i.e. number of matching documents is less or equal to the
+      // queries limit.
+      if (!self._unpublishedBuffer.size)
+        return;
+
       var newDocId = self._unpublishedBuffer.minElementId();
       var newDoc = self._unpublishedBuffer.get(newDocId);
-      self._unpublishedBuffer.remove(newDocId);
-      self._published.add(newDocId, newDoc);
-      self._multiplexer.added(newDocId, self._projectionFn(newDoc));
+      self._removeBuffered(newDocId);
+      self._addPublished(newDocId, newDoc);
     }
   },
   _changePublished: function (id, oldDoc, newDoc) {
