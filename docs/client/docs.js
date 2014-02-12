@@ -94,20 +94,20 @@ Meteor.startup(function () {
 var toc = [
   {name: "Meteor " + Template.headline.release(), id: "top"}, [
     "Quick start",
-    "Seven principles",
-    "Resources"
+    "I Sette Principi",
+    "Risorse"
   ],
-  "Concepts", [
-    "What is Meteor?",
-    "Structuring your app",
-    "Data and security",
-    "Reactivity",
+  "Concetti", [
+    "Cos'è Meteor?",
+    "Struttura di un'app",
+    "Dati e sicurezza",
+    "Reattività",
     "Live HTML",
     "Templates",
-    "Using packages",
+    "Utilizzo dei packages",
     "Namespacing",
     "Deploying",
-    "Writing packages"
+    "Scrittura di packages"
   ],
 
   "API", [
