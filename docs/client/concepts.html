@@ -61,7 +61,7 @@ email ed il server non può gestire gli eventi del mouse). Tutto
 l'ecosistema è stato costruito per supportare questo principio.
 
 {{#note}}
-'meteor' non può installare package da Atmosphere. Se si utilizzano
+`meteor` non può installare package da Atmosphere. Se si utilizzano
 package di Atmosphere bisogna usare [Meteorite](http://oortcloud.github.io/meteorite/),
 un'applicazione che gestisce ed installa i package di Atmosphere.
 
@@ -74,100 +74,98 @@ I Meteor 1.0, `meteor` incorporerà il pieno supporto ad Atmosphere.
 <template name="structure">
 {{#better_markdown}}
 
-<h2 id="structuringyourapp">Structuring your application</h2>
+<h2 id="structuringyourapp">Struttura di una applicazione</h2>
 
-A Meteor application is a mix of JavaScript that runs inside a client web
-browser, JavaScript that runs on the Meteor server inside a
-[Node.js](http://nodejs.org/) container, and all the supporting HTML fragments,
-CSS rules, and static assets.  Meteor automates the packaging and transmission
-of these different components.  And, it is quite flexible about how you choose
-to structure those components in your file tree.
+Una applicazione Meteor è un mix di JavaScript eseguito nel browser,
+JavaScript eseguito dal server di Meteor in un'istanza di [Node.js](http://nodejs.org),
+più tutto l'HTML di supporto, regole CSS e asset statici (immagini, icone,
+fonts...). Meteor automatizza la gestione e l'assemblaggio di questi
+componenti. Inoltre lascia un buon grado di libertà sull'organizzazione
+di file e cartelle che contengono questi componenti.
 
-The only server assets are JavaScript and files in the `private` subdirectory.
-Meteor gathers all your JavaScript
-files, excluding anything under the `client`, `public`, and `private`
-subdirectories, and loads them into a Node.js
-server instance inside a fiber.  In Meteor, your server code runs in
-a single thread per request, not in the asynchronous callback style
-typical of Node.  We find the linear execution model a better fit for
-the typical server code in a Meteor application.
+Lato server vengono visti solo i file JavaScript ed i file contenuti
+nella cartella `private`. Meteor raggruppa tutti i file
+JavaScript, esclusi quelli nelle cartelle `client`, `public` e
+`private` e li serve ad una istanza di Node.js in una fiber. In Meteor,
+il codice server-side viene eseguito in un singolo thread per richiesta,
+non come callback asincrona tipica di Node. Abbiamo scelto il modello
+di esecuzione lineare sincrono perchè ci sembra più adatto per il
+codice server di una applicazione Meteor.
 
-Meteor gathers any files under the `private` subdirectory and makes the contents
-of these files available to server code via the [`Assets`](#assets) API. The
-`private` subdirectory is the place for any files that should be accessible to
-server code but not served to the client, like private data files.
+Tutti i file nella cartella `private` sono resi disponibili al
+solo codice server attraverso l'API [`Assets`](#assets). La cartella
+`private` deve essere usata per conservare i file accessibili al codice
+server side ma che non devono essere trasferiti al client, cioè i dati
+privati, appunto.
 
-There are more assets to consider on the client side.  Meteor
-gathers all JavaScript files in your tree, with the exception of
-the `server`, `public`, and `private` subdirectories, for the
-client.  It minifies this bundle and serves it to each new client.
-You're free to use a single JavaScript file for your entire application, or
-create a nested tree of separate files, or anything in between.
+Lato client vengono gestite anche altre risorse. Meteor mette insieme
+e rende disponibili al client tutti i file del progetto ad
+esclusione delle cartelle `server`, `public` e `private`.
+I file vengono compressi e trasferiti ad ogni client. Si è liberi di
+usare un unico file JavaScript per l'intera applicazione o creare una
+struttura ad albero di file singoli, o una via di mezzo. 
 
-Some JavaScript libraries only work when placed in the
-`client/compatibility` subdirectory.  Files in this directory are
-executed without being wrapped in a new variable scope.  This means
-that each top-level `var` defines a global variable. In addition,
-these files are executed before other client-side JavaScript files.
+Alcune librerie JavaScript funzionano solo se messe in
+`client/compatibility`. I file in questa cartella sono eseguiti senza
+essere inglobati nello scope di una nuova variabile. Significa che ogni
+`var` non locale definisce una variabile globale. Inoltre questi file
+vengono eseguiti prima degli altri file JavaScript client side.
 
-Files outside the `client`, `server` and `tests` subdirectories are loaded on
-both the client and the server!  That's the place for model definitions and
-other functions.  Meteor provides the variables [`isClient`](#meteor_isclient) and
-[`isServer`](#meteor_isserver) so that your code can alter its behavior depending
-on whether it's running on the client or the server. (Files in directories named
-`tests` are not loaded anywhere.)
+Il file esterni alle cartelle `client`, `server` e `tests` vengono
+caricati sia sul client che sul server! E' dove possiamo definire la
+nostra base dati (il modello) e le altre funzioni. Meteor permette di
+consultare le variabili [`isClient`](#meteor_isclient) e [`isServer`](#meteor_isserver)
+per eseguire codice solo lato client o solo lato server. (I file della
+cartella `tests` non vengono caricati da nessuna parte.)
 
-Any sensitive code that you don't want served to the client, such as code
-containing passwords or authentication mechanisms, should be
-kept in the `server` directory.
+Tutto il codice riservato che non si vuole rendere visibile lato
+client, come il codice che contiene password o meccanismi di
+autenticazione, dovrebbe stare nella cartella `server`.
 
-CSS files are gathered together as well: the client will get a bundle with all
-the CSS in your tree (excluding the `server`,
-`public`, and `private` subdirectories).
+Anche i file CSS sono raggruppati insieme: il client riceverà un unico
+file con tutti i CSS (esclusi quelli eventualmente contenuti nelle
+cartelle `server`, `public` e `private`).
 
-In development mode, JavaScript and CSS files are sent individually to make
-debugging easier.
+In modalità debug i file JavaScript e CSS sono inviati divisi per
+rendere il debug più semplice.
 
-HTML files in a Meteor application are treated quite a bit differently
-from a server-side framework.  Meteor scans all the HTML files in your
-directory for three top-level elements: `<head>`, `<body>`, and
-`<template>`.  The head and body sections are separately concatenated
-into a single head and body, which are transmitted to the client on
-initial page load.
+I file HTML in Meteor sono gestiti diversamente dagli altri framework
+server-side. Meteor legge tutti i file HTML alla ricerca degli elementi
+`<head>`, `<body>` e `<template>` nella radice della struttura.
+Le sezioni head e body sono unite in un unico file trasmesso al client
+al momento del caricamenteo iniziale dell'applicazione.
 
-Template sections, on the other hand, are converted into JavaScript
-functions, available under the `Template` namespace.  It's
-a really convenient way to ship HTML templates to the client.
-See the [templates](#templates) section for more.
+Le sezioni template invece sono convertite in funzioni JavaScript
+disponibili nel namespace `Template`. E' un modo molto efficiente di
+fornire i template HTML al client.
+Si può consultare la sezione [templates](#templates) per ulteriori
+dettagli.
 
-Lastly, the Meteor server will serve any files under the `public`
-directory, just like in a Rails or Django project.  This is the place
-for images, `favicon.ico`, `robots.txt`, and anything else.
+Infine il server Meteor rende disponibili i file nella cartella `public`
+allo stesso modo dei framework Rails o Django. Qui mettiamo le
+immagini, `favicon.ico`, `robots.txt` e tutto il resto.
 
-It is best to write your application in such a way that it is
-insensitive to the order in which files are loaded, for example by
-using [Meteor.startup](#meteor_startup), or by moving load order
-sensitive code into [packages](#usingpackages), which can explicitly control both
-the load order of their contents and their load order with respect to
-other packages. However sometimes load order dependencies in your
-application are unavoidable. The JavaScript and CSS files in an
-application are loaded according to these rules:
+E' buona norma scrivere la nostra applicaziome in modo che sia
+indipendente dall'ordine con cui i file vengono caricati, ad esempio
+usando [Meteor.startup](#meteor_startup), o spostando il codice che
+dipende da un particolare ordine di caricamento nei [packages](#usingpackages)
+dove si può esplicitamente controllare l'ordine di caricamento del
+proprio contenuto e dello stesso package rispetto agli altri.
 
-* Files in directories named `lib` are loaded first.
+* I file nella cartella `lib` vengono caricati per primi.
 
-* Files that match `main.*` are loaded after everything else.
+* I file `main.*` vengono caricati dopo tutto il resto.
 
-* Files in subdirectories are loaded before files in parent
-  directories, so that files in the deepest subdirectory are loaded
-  first (after `lib`), and files in the root directory are loaded last
-  (other than `main.*`).
+* I file nelle sottocartelle vengono caricati prima dei file delle
+  cartelle padre, quindi i file nelle cartelle più nidificate vengono
+  caricati per prima (dopo `lib` però), e i file nella root sono
+  caricati per ultimi (ma prima di `main.*`).
 
-* Within a directory, files are loaded in alphabetical order by
-  filename.
+* Nella stessa cartella i file sono caricati in ordine alfabetico.
 
-These rules stack, so that within `lib`, for example, files are still
-loaded in alphabetical order; and if there are multiple files named
-`main.js`, the ones in subdirectories are loaded earlier.
+Queste regole si sommano, quindi ad esempio all'interno di `lib` i file
+vengono caricati in ordine alfabetico; e se esistono più file
+denominati `main.js`, quelli nelle sottocartelle vengono caricati prima.
 
 {{/better_markdown}}
 </template>
