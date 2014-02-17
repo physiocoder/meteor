@@ -173,40 +173,42 @@ denominati `main.js`, quelli nelle sottocartelle vengono caricati prima.
 <template name="data">
 {{#better_markdown}}
 
-<h2 id="dataandsecurity">Data and security</h2>
+<h2 id="dataandsecurity">Dati e sicurezza</h2>
 
-Meteor makes writing distributed client code as simple as talking to a
-local database.  It's a clean, simple, and secure approach that obviates
-the need to implement individual RPC endpoints, manually cache data on
-the client to avoid slow roundtrips to the server, and carefully
-orchestrate invalidation messages to every client as data changes.
+Meteor rende la scrittura di codice lato client semplice perchè si
+interfaccia sempre con un database locale. E’ un approccio
+semplice, pulito e sicuro che ci risparmia di dover implementare Remote
+Procedure Call, di mantenere manualmente una cache sul client (che evita
+lente consultazioni al server) e di impegnarsi nella faticosa gestione
+della sincronizzazione di tutti i client quando i dati cambiano.
 
-In Meteor, the client and server share the same database API.  The same
-exact application code &mdash; like validators and computed properties &mdash; can
-often run in both places.  But while code running on the server has
-direct access to the database, code running on the client does *not*.
-This distinction is the basis for Meteor's data security model.
+In Meteor, il client ed il server condividono le stesse API per
+l’accesso al database. Lo stesso codice &mdash; per la validazione e
+l'elaborazione dei dati &mdash; può spesso girare su entrambi i lati.
+La differenza è che il codice che gira lato server ha accesso diretto
+al database, quello lato client *no*. Su questa distinzione si fonda il
+modello di sicurezza dei dati in Meteor.
 
 {{#note}}
-By default, a new Meteor app includes the `autopublish` and `insecure`
-packages, which together mimic the effect of each client having full
-read/write access to the server's database.  These are useful
-prototyping tools, but typically not appropriate for production
-applications.  When you're ready, just remove the packages.
+Per default una nuova applicazione Meteor include i packages
+`autopublish` e `insecure`, che insieme permettono ad ogni client di
+avere accesso completo in lettura/scrittura al database sul server.
+Sono strumenti utili in fase di prototipizzazione dell’applicazione,
+ma ovviamente non adatti al prodotto finale. Quando è il momento, basta
+rimuovere questi packages.
 {{/note}}
 
-Every Meteor client includes an in-memory database cache.  To manage the
-client cache, the server *publishes* sets of JSON documents, and the
-client *subscribes* to those sets.  As documents in a set change, the
-server patches each client's cache.
+Con Meteor ogni client possiede un database in memoria. Per gestire
+questa cache lato client, il server *pubblica* set di documenti JSON,
+ed il client *sottoscrive* questi set. Quando i documenti in un
+set cambiano, il server aggiorna le cache di tutti i client.
 
-Today most Meteor apps use MongoDB as their database because it is the
-best supported, though support for other databases is coming in the
-future. The
-[`Meteor.Collection`](http://docs.meteor.com/#meteor_collection) class
-is used to declare Mongo collections and to manipulate them. Thanks to
-`minimongo`, Meteor's client-side Mongo emulator, `Meteor.Collection`
-can be used from both client and server code.
+Ad oggi la maggior parte delle applicazioni sviluppate con Meteor usa
+MongoDB perchè è quello meglio supportato, ma è già previsto in futuro
+il supporto per altri database. La classe [Meteor.Collection](http://docs.meteor.com/#meteor_collection)
+è utilizzata per dichiarare collezioni in Mongo e manipolarle. Grazie a
+`minimongo`, l’emulatore di Mongo che gira nel browser,
+`Meteor.Collection` può essere usata sia lato client che server.
 
     // declare collections
     // this code should be included in both the client and the server
@@ -220,10 +222,11 @@ can be used from both client and server code.
     Messages.insert({text: "Hello world", room: myRooms[0]._id});
     Parties.insert({name: "Super Bowl Party"});
 
-Each document set is defined by a publish function on the server.  The
-publish function runs each time a new client subscribes to a document
-set.  The data in a document set can come from anywhere, but the common
-case is to publish a database query.
+Ogni set di documenti è definito da una funzione di pubblicazione
+sul server. La funzione di pubblicazione viene eseguita ogni volta che
+un nuovo client sottoscrive quel set di documenti. I dati che
+compongono un set di documenti possono provenire da qualsiasi fonte, ma
+la cosa più probabile è che provengano da una query sul database.
 
     // server: publish all room documents
     Meteor.publish("all-rooms", function () {
@@ -243,15 +246,17 @@ case is to publish a database query.
                                  {owner: this.userId}]});
     });
 
-Publish functions can provide different results to each client.  In the
-last example, a logged in user can only see `Party` documents that
-are public, that the user owns, or that the user has been invited to.
+Le funzioni di pubblicazione possono fornire risultati diversi per ogni
+client. Nell’esempio sopra un utente loggato può vedere solo documenti
+della collezione `Parties` che sono pubblici, che l’utente possiede o a
+cui l’utente è stato invitato.
 
-Once subscribed, the client uses its cache as a fast local database,
-dramatically simplifying client code.  Reads never require a costly
-round trip to the server.  And they're limited to the contents of the
-cache: a query for every document in a collection on a client will only
-return documents the server is publishing to that client.
+Una volta sottoscritto, il client usa la sua cache come un veloce
+database locale, semplificando enormemente il codice lato client. Le
+operazioni di lettura non richiedono mai una lenta richiesta al server.
+Inoltre sono limitate al contenuto della cache: sul client una query su
+tutti i documenti restituirà solo i documenti che il server ha
+pubblicato per quel client.
 
     // client: start a parties subscription
     Meteor.subscribe("parties");
@@ -259,16 +264,19 @@ return documents the server is publishing to that client.
     // client: return array of Parties this client can read
     return Parties.find().fetch(); // synchronous!
 
-Sophisticated clients can turn subscriptions on and off to control how
-much data is kept in the cache and manage network traffic.  When a
-subscription is turned off, all its documents are removed from the cache
-unless the same document is also provided by another active
-subscription.
+Dal lato client possiamo poi decidere di attivare e disattivare le
+sottoscrizioni per regolare la quantità di dati mantenuta nella cache e
+gestire al meglio il traffico sulla rete. Quando una sottoscrizione
+viene disattivata, tutti i suoi documenti sono rimossi dalla cache, a
+meno che lo stesso documento non venga fornito da un’altra
+sottoscrizione attiva.
 
-When the client *changes* one or more documents, it sends a message to
-the server requesting the change.  The server checks the proposed change
-against a set of allow/deny rules you write as JavaScript functions.
-The server only accepts the change if all the rules pass.
+Quando il client *cambia* uno o più documenti manda un messaggio al
+server per memorizzare la variazione. Il server verifica i cambiamenti
+proposti tenendo conto di una serie di regole permetti/nega che lo
+sviluppatore ha scritto sotto forma di funzioni Javascript. A questo
+punto il server accetta i cambiamenti se tutte le regole sono
+rispettate.
 
     // server: don't allow client to insert a party
     Parties.allow({
@@ -281,32 +289,32 @@ The server only accepts the change if all the rules pass.
     var party = { ... };
     Parties.insert(party);
 
-If the server accepts the change, it applies the change to the database
-and automatically propagates the change to other clients subscribed to
-the affected documents.  If not, the update fails, the server's database
-remains untouched, and no other client sees the update.
+Se il server accetta le modifiche, le applica al database e
+automaticamente le propaga a tutti i client che hanno sottoscritto i
+documenti modificati. Se non le accetta, l’aggiornamento fallisce, il
+database rimane inalterato e nessun client vede le modifiche.
 
-Meteor has a cute trick, though.  When a client issues a write to the
-server, it also updates its local cache immediately, without waiting for
-the server's response.  This means the screen will redraw right away.
-If the server accepted the update &mdash; what ought to happen most of the
-time in a properly behaving client &mdash; then the client got a jump on the
-change and didn't have to wait for the round trip to update its own
-screen.  If the server rejects the change, Meteor patches up the
-client's cache with the server's result.
+Sveliamo ora che Meteor si serve di un trucco. Quando un client scrive
+qualcosa nel database, la cache nel client viene aggiornata
+immediatamente senza attendere la risposta del server. In questo modo
+l'utente riceve immediato feedback di esecuzione della scrittura. Se
+successivamente il server valida ed accetta la modifica &mdash; ed è
+ciò che dovrebbe accadere nella maggioranza dei casi &mdash; il client
+non necessita di ulteriore aggiornamento della schermata. Se invece il
+server annulla la modifica, Meteor risincronizza la cache del client
+con i dati del server.  
 
-Putting it all together, these techniques accomplish latency
-compensation.  Clients hold a fresh copy of the data they need, and
-never need to wait for a roundtrip to the server. And when clients
-modify data, those modifications can run locally without waiting for the
-confirmation from the server, while still giving the server final say
-over the requested change.
+Tutto ciò in sostanza realizza la compensazione della latenza. I
+client hanno sempre una copia aggiornata dei dati e non hanno mai
+bisogno di attendere il server. Quando i client modificano i dati,
+le modifiche vengono immediatamente memorizzate senza attendere la
+conferma dal server, pur dando a quest'ultimo l'ultima parola sulla
+validità delle modifiche stesse.
 
 {{#note}}
-The current release of Meteor supports MongoDB, the popular document
-database, and the examples in this section use the
-        [MongoDB API](http://www.mongodb.org/display/DOCS/Manual).  Future
-releases will include support for other databases.
+L'attuale release di Meteor supporta MongoDB, il famoso database basato
+su documenti, e gli esempi usano le [MongoDB API](http://www.mongodb.org/display/DOCS/Manual).
+Le future versioni avranno il supporto per altri database.
 {{/note}}
 
 <h3 id="dataandsecurity-authentication">Authentication and user accounts</h3>
