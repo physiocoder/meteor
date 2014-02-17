@@ -7,6 +7,8 @@ sono benvenuti.
 L'idea è di arrivare a tradurre tutta la documentazione ad esclusione
 delle API, almeno fino a quando non sarà disponibile la release 1.0.
 
+Questa traduzione è disponibile all'indirizzo http://it-docs.meteor.com.
+
 ### Linee guida
 
 Nello scrivere la traduzione sono state seguite alcune norme:
