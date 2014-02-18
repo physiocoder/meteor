@@ -403,7 +403,7 @@ Template.nav.sections = function () {
 
 Template.nav.type = function (what) {
   return this.type === what;
-}
+};
 
 Template.nav.maybe_current = function () {
   return Session.equals("section", this.id) ? "current" : "";
