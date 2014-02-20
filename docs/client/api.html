@@ -120,7 +120,7 @@ Example:
           count--;
           self.changed("counts", roomId, {count: count});
         }
-        // don't care about moved or changed
+        // don't care about changed
       });
 
       // Observe only returns after the initial added callbacks have
@@ -1280,8 +1280,12 @@ that needs to deal with `_id` fields that may be either strings or `ObjectID`s, 
 
 {{#api_box_inline selectors}}
 
-In its simplest form, a selector is just a set of keys that must
-match in a document:
+The simplest selectors are just a string or
+[`Meteor.Collection.ObjectID`](#collection_object_id). These selectors match the
+document with that value in its `_id` field.
+
+A slightly more complex form of selector is an object containing a set of keys
+that must match in a document:
 
     // Matches all documents where deleted is false
     {deleted: false}
@@ -1304,7 +1308,7 @@ But they can also contain more complicated tests:
     {fruit: {$in: ["peach", "plum", "pear"]}}
 
 See the [complete
-documentation](http://www.mongodb.org/display/DOCS/Advanced+Queries).
+documentation](http://docs.mongodb.org/manual/reference/operator/).
 
 {{/api_box_inline}}
 
@@ -1649,7 +1653,7 @@ sites:
 - GitHub: <http://developer.github.com/v3/oauth/#scopes>
 - Google: <https://developers.google.com/accounts/docs/OAuth2Login#scopeparameter>
 - Meetup: <http://www.meetup.com/meetup_api/auth/#oauth2-scopes>
-- Twitter, Weibo: `requestPermissions` currently not supported
+- Twitter, Weibo, Meteor developer accounts: `requestPermissions` currently not supported
 
 External login services typically require registering and configuring
 your application before use. The easiest way to do this is with the
@@ -2941,9 +2945,25 @@ When you add a type to EJSON, Meteor will be able to use that type in:
 
 {{/note}}
 
-Instances of your type should implement the following interface:
+Instances of your type must implement [`typeName`](#ejson_type_typeName) and
+[`toJSONValue`](#ejson_type_toJSONValue) methods, and may implement
+[`clone`](#ejson_type_clone) and [`equals`](#ejson_type_equals) methods if the
+default implementations are not sufficient.
+
+{{> api_box ejsonTypeName}}
+{{> api_box ejsonTypeToJSONValue}}
+
+For example, the `toJSONValue` method for
+[`Meteor.Collection.ObjectID`](#collection_object_id) could be:
+
+    function () {
+      return this.toHexString();
+    };
 
 {{> api_box ejsonTypeClone}}
+
+If your type does not have a `clone` method, `EJSON.clone` will use
+[`toJSONValue`](#ejson_type_toJSONValue) and the factory instead.
 
 {{> api_box ejsonTypeEquals}}
 
@@ -2955,15 +2975,9 @@ the following properties:
  - *Symmetry* - for any two instances `a` and `b`: `a.equals(b)` if and only if `b.equals(a)`.
  - *Transitivity* - for any three instances `a`, `b`, and `c`: `a.equals(b)` and `b.equals(c)` implies `a.equals(c)`.
 
-{{> api_box ejsonTypeName}}
-{{> api_box ejsonTypeToJSONValue}}
+If your type does not have an `equals` method, `EJSON.equals` will compare the
+result of calling [`toJSONValue`](#ejson_type_toJSONValue) instead.
 
-For example, the `toJSONValue` method for
-[`Meteor.Collection.ObjectID`](#collection_object_id) could be:
-
-    function () {
-      return this.toHexString();
-    };
 
 <h2 id="http"><span>HTTP</span></h2>
 
