@@ -59,7 +59,11 @@ If there are, they will be signaled by `git` in the last merge (step 4) and I ca
 
 ####Last but not least:
 
-- Called for contributors on `meteor-talk` and Twitter (they can fork my rep, create a new branch and then send me a pull request to it-docs);  
+- Called for contributors on `meteor-talk` and Twitter (they can fork my rep, create a new branch and then send me a pull request to `it-docs`);  
 - Made `it-docs` branch the default on my fork on GitHub so when people come visit my rep they land on translation branch;
 
 I know, seems a little bit long and difficult but hope this could be of help as a reference for translating Meteor Docs.
+
+####UPDATE - Improvements
+
+Wondering if it's better to create the translation branch from `master` instead of `devel`: [Meteor guidelines](https://github.com/meteor/meteor/wiki/Contributing-to-Meteor) suggest to create a branch off `devel` because in the end is where they will (in case) merge your pull request. But since translation is a fork that will not be eventually merged maybe `master` is a better and more stable branch to base translations.
