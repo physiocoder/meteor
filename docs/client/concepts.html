@@ -65,7 +65,7 @@ l'ecosistema è stato costruito per supportare questo principio.
 package di Atmosphere bisogna usare [Meteorite](http://oortcloud.github.io/meteorite/),
 un'applicazione che gestisce ed installa i package di Atmosphere.
 
-I Meteor 1.0, `meteor` incorporerà il pieno supporto ad Atmosphere.
+In Meteor 1.0, `meteor` incorporerà il pieno supporto ad Atmosphere.
 {{/note}}
 
 {{/better_markdown}}
@@ -302,7 +302,7 @@ successivamente il server valida ed accetta la modifica &mdash; ed è
 ciò che dovrebbe accadere nella maggioranza dei casi &mdash; il client
 non necessita di ulteriore aggiornamento della schermata. Se invece il
 server annulla la modifica, Meteor risincronizza la cache del client
-con i dati del server.  
+con i dati del server.
 
 Tutto ciò in sostanza realizza la compensazione della latenza. I
 client hanno sempre una copia aggiornata dei dati e non hanno mai
@@ -317,43 +317,45 @@ su documenti, e gli esempi usano le [MongoDB API](http://www.mongodb.org/display
 Le future versioni avranno il supporto per altri database.
 {{/note}}
 
-<h3 id="dataandsecurity-authentication">Authentication and user accounts</h3>
+<h3 id="dataandsecurity-authentication">Autenticazione e gestione utenti</h3>
 
-Meteor includes [Meteor Accounts](#accounts_api), a state-of-the-art
-authentication system. It features secure password login using the
-[Secure Remote Password
-protocol](http://en.wikipedia.org/wiki/Secure_Remote_Password_protocol),
-and integration with external services including Facebook, GitHub,
-Google, Meetup, Twitter, and Weibo. Meteor Accounts defines a
-[`Meteor.users`](#meteor_users) collection where developers can store
-application-specific user data.
+Meteor include un sistema di autenticazione all'avanguardia: [Meteor
+Accounts](#account_api). Prevede la gestione dei login con password
+tramite [Secure Remote Password control](http://en.wikipedia.org/wiki/Secure_Remote_Password_protocol),
+oppure attraverso l'integrazione con servizi esterni come Facebook,
+GitHub, Google, Meetup, Twitter e Weibo. Meteor Accounts crea una
+collezione [`Meteor.users`](#meteor_users) dove possono essere
+memorizzati i dati utente specifici dell'applicazione.
 
-Meteor also includes pre-built forms for common tasks like login, signup,
-password change, and password reset emails. You can add [Accounts
-UI](#accountsui) to your app with just one line of code. The `accounts-ui` package even provides a configuration wizard that walks you through the steps to
-set up the external login services you're using in your app.
+Meteor inoltre fornisce form gia predisposte per le attività più comuni
+come login, sottoscrizione, cambio password e reset della password
+tramite email. Per averle basta aggiungere [Accounts UI](#accountsui)
+con una sola riga di comando. Il package `accounts-ui` fornisce anche un
+wizard di configurazione per impostare l'uso dei servizi esterni di
+login nella propria applicazione.
 
-<h3 id="dataandsecurity-validation">Input validation</h3>
+<h3 id="dataandsecurity-validation">Validazione dell'input</h3>
 
-Meteor allows your methods and publish functions to take arguments of any
-[JSON](http://json.org/) type. (In fact, Meteor's wire protocol supports
-[EJSON](#ejson), an extension of JSON which also supports other common types
-like dates and binary buffers.) JavaScript's dynamic typing means you don't need
-to declare precise types of every variable in your app, but it's usually helpful
-to ensure that the arguments that clients are passing to your methods and
-publish functions are of the type that you expect.
+Meteor consente di usare argomenti di tipo [JSON](http://json.org) per i metodi
+e le funzioni di pubblicazione (in realtà, il protocollo di comunicazione di
+Meteor supporta [EJSON](#ejson), una estensione di JSON che supporta anche
+altri tipi di dati comuni, come date e buffer binari.) Sebbene JavaScript
+faccia uso di tipi di dato dinamici che evitano di dover dichiarare l'esatto
+tipo di ogni variabile utilizzata, è tuttavia utile assicurarsi che gli
+argomenti passati dal client ai metodi ed alle funzioni di pubblicazione
+siano esattamente del tipo atteso.
 
-Meteor provides a [lightweight library](#match) for checking that arguments and
-other values are the type you expect them to be. Simply start your functions
-with statements like `check(username, String)` or
-`check(office, {building: String, room: Number})`. The `check` call will
-throw an error if its argument is of an unexpected type.
+Meteor fornisce una [mini libreria](#match) per controllare che gli argomenti
+e gli altri valori siano del tipo atteso. Basta invocare dei controlli del
+tipo `check(username, String)` oppure `check(office, {building:
+String, room: Number})` prima di chiamare ogni funzione. La chiamata a `check`
+produrrà un errore se l'argomento passato non è del tipo specificato.
 
-Meteor also provides an easy way to make sure that all of your methods
-and publish functions validate all of their arguments. Just run
-<code>meteor add [audit-argument-checks](#auditargumentchecks)</code> and any
-method or publish function which skips `check`ing any of its arguments will fail
-with an exception.
+Meteor fornisce anche un metodo veloce per accertarsi che tutti i metodi e le
+funzioni di pubblicazione facciano la validazione di tutti gli argomenti. Basta
+aggiungere il package <code>meteor add [audit-argument-checks](#auditargumentchecks)</code>:
+tutti i metodi e le funzioni di pubblicazione che non fanno il `check`ing
+produrranno un'ecccezione.
 
 {{/better_markdown}}
 </template>
