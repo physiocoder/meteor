@@ -347,15 +347,15 @@ siano esattamente del tipo atteso.
 
 Meteor fornisce una [mini libreria](#match) per controllare che gli argomenti
 e gli altri valori siano del tipo atteso. Basta invocare dei controlli del
-tipo `check(username, String)` oppure `check(office, {building:
-String, room: Number})` prima di chiamare ogni funzione. La chiamata a `check`
-produrrà un errore se l'argomento passato non è del tipo specificato.
+tipo `check(username, String)` oppure `check(office, {building: String, room: Number})`
+prima di chiamare ogni funzione. La chiamata a `check` produrrà un errore se
+l'argomento passato non è del tipo specificato.
 
 Meteor fornisce anche un metodo veloce per accertarsi che tutti i metodi e le
 funzioni di pubblicazione facciano la validazione di tutti gli argomenti. Basta
-aggiungere il package <code>meteor add [audit-argument-checks](#auditargumentchecks)</code>:
+aggiungere il package <code>meteor add [audit-argument-checks](#auditargumentchecks)</code> :
 tutti i metodi e le funzioni di pubblicazione che non fanno il `check`ing
-produrranno un'ecccezione.
+produrranno un'eccezione.
 
 {{/better_markdown}}
 </template>
@@ -363,66 +363,67 @@ produrranno un'ecccezione.
 <template name="reactivity">
 {{#better_markdown}}
 
-<h2 id="reactivity">Reactivity</h2>
+<h2 id="reattivit">Reattività</h2>
 
-Meteor embraces the concept of [reactive
-programming](http://en.wikipedia.org/wiki/Reactive_programming). This means that
-you can write your code in a simple imperative style, and the result will be
-automatically recalculated whenever data changes that your code depends on.
+Meteor sposa il concetto di [reactive programming](http://en.wikipedia.org/wiki/Reactive_programming).
+Significa che il codice può essere scritto in semplice stile imperativo ma
+verrà rieseguito automaticamente ogni volta che i dati da cui dipende saranno
+modificati.
 
     Deps.autorun(function () {
       Meteor.subscribe("messages", Session.get("currentRoomId"));
     });
 
-This example (taken from a chat room client) sets up a data
-subscription based on the session variable `currentRoomId`.
-If the value of `Session.get("currentRoomId")` changes for any reason, the
-function will be automatically re-run, setting up a new subscription that
-replaces the old one.
+Questo esempio (preso dal client di una chat room) sottoscrive dei dati in base
+al valore della variabile di sessione `currentRoomId`. Se il valore di
+`Session.get("currentRoomId")` cambia per qualsiasi motivo la funzione sarà
+automaticamente rieseguita, ed una nuova sottoscrizione andrà a sostituire la
+precedente.
 
-This automatic recomputation is achieved by a cooperation between
-`Session` and `Deps.autorun`.  `Deps.autorun` performs an arbitrary "reactive
-computation" inside of which data dependencies are tracked, and it
-will re-run its function argument as necessary.  Data providers like
-`Session`, on the other hand, make note of the computation they are
-called from and what data was requested, and they are prepared to send
-an invalidation signal to the computation when the data changes.
+Questo aggiornamento automatico si ottiene attraverso la cooperazione tra
+`Session` e `Deps.autorun`. `Deps.autorun` decide quando eseguire una
+"elaborazione reattiva" delle funzioni passate come argomento, cioè al variare
+dei dati da cui ogni funzione dipende. I dati, come ad esempio quelli forniti
+dall'oggetto `Session`, sanno quale codice li monitorizza e si occupano di
+segnalare a quel codice che sono cambiati ed è quindi necessaria una nuova
+elaborazione.
 
-This simple pattern (reactive computation + reactive data source) has wide
-applicability.  Above, the programmer is saved from writing
-unsubscribe/resubscribe calls and making sure they are called at the
-right time.  In general, Meteor can eliminate whole classes of data
-propagation code which would otherwise clog up your application with
-error-prone logic.
+Questo schema di funzionamento (esecuzione reattiva + sorgente dati reattiva) ha
+grandi benefici. Nell'esempio sopra, il programmatore non si deve preoccupare di
+scrivere il codice che ri-sottoscrive al momento opportuno i dati aggiornati.
+Meteor permette quindi di eliminare il codice che si occupa di tenere traccia
+delle modifiche ai dati che finirebbe per intasare l'applicazione con la
+conseguenza di introdurre bug.
 
-These Meteor functions run your code as a reactive computation:
+Queste funzioni in Meteor permettono di scrivere codice che sarà eseguito in
+maniera reattiva:
 
 * [Templates](#templates)
-* [`Meteor.render`](#meteor_render) and [`Meteor.renderList`](#meteor_renderlist)
+* [`Meteor.render`](#meteor_render) e [`Meteor.renderList`](#meteor_renderlist)
 * [`Deps.autorun`](#deps_autorun)
 
-And the reactive data sources that can trigger changes are:
+Mentre le sorgenti dati reattive che possono scatenare la riesecuzione sono:
 
-* [`Session`](#session) variables
-* Database queries on [Collections](#find)
+* Le variabili memorizzate in [`Session`](#session)
+* Query sulle [Collections](#find) del database
 * [`Meteor.status`](#meteor_status)
-* The `ready()` method on a [subscription handle](#meteor_subscribe)
+* Il metodo `ready()` su un [subscription handle](#meteor_subscribe)
 * [`Meteor.user`](#meteor_user)
 * [`Meteor.userId`](#meteor_userid)
 * [`Meteor.loggingIn`](#meteor_loggingin)
 
-In addition, the following functions which return an object with a
-`stop` method, if called from a reactive computation, are stopped when
-the computation is rerun or stopped:
+Inoltre le seguenti funzioni che ritornano un oggetto con un metodo
+`stop`, vengono interrote quando il ricalcolo viene eseguito o fermato, se
+usate nel codice ad esecuzione reattiva.
 
-* [`Deps.autorun`](#deps_autorun) (nested)
+* [`Deps.autorun`](#deps_autorun) (annidata)
 * [`Meteor.subscribe`](#meteor_subscribe)
-* [`observe()`](#observe) and [`observeChanges()`](#observe_changes) on cursors
+* [`observe()`](#observe) e [`observeChanges()`](#observe_changes) sui cursori
 
-Meteor's
-[implementation](https://github.com/meteor/meteor/blob/master/packages/deps/deps.js)
-is a package called [`Deps`](#deps) that is fairly short and straightforward.
-You can use it yourself to implement new reactive data sources.
+Tutto ciò in Meteor è
+[implementato](https://github.com/meteor/meteor/blob/master/packages/deps/deps.js)
+in un package chiamato [`Deps`](#deps) piuttosto piccolo e facilmente
+comprensibile. Lo si può usare per implementare nuove sorgenti dati reattive.
 
 {{/better_markdown}}
 </template>
