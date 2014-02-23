@@ -40,22 +40,28 @@ In order to stay in sync with Meteor development, on my local repository (inspir
 
         git fetch upstream
 
-3. Merge `upstream/devel` with `devel`
-
-        git checkout devel
-        git merge upstream/devel
-
-4. Merge `it-docs` with `devel`:
+3. Merge `upstream/devel` with `it-docs`
 
         git checkout it-docs
-        git merge devel
+        git merge upstream/devel
 
-Having in my local repository both `devel` and `upstream/devel` I can check the official updates to the documentation before merging (step 3) with:
+4. If there are no update to original docs `merge` goes flawless with fast forward. DONE!
 
-        git diff devel upstream/devel -- docs
+5. If there were updates in original docs that conflicts with translation already done `git merge` output an error signaling files with such conflicts. To resolve conflict invoke `FileMerge` utility with:
 
-In this way I can see only updates to the `docs` section and if they are of some interest to my translation.
-If there are, they will be signaled by `git` in the last merge (step 4) and I can choose to update translation accordingly.
+        git mergetool -t opendiff
+
+5. `FileMerge` provides a GUI where you will see translated doc on the left, original updated doc on the right and the proposed merged file on the bottom. By default proposed merged is just what we want: a translated doc where updated parts are again in english. Save merged file and say `y` if asked `Was the merge successful? [y/n]` at command prompt.
+
+6. Commit merge and accept default commit message with:
+
+        git commit
+
+7. Edit files containing conflicts translating only merged english parts. Then:
+
+        git commit -a -m "Translated conflicts from last merge"
+
+DONE!
 
 ####Last but not least:
 
