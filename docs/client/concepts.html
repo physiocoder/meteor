@@ -152,20 +152,18 @@ dipende da un particolare ordine di caricamento nei [packages](#usingpackages)
 dove si può esplicitamente controllare l'ordine di caricamento del
 proprio contenuto e dello stesso package rispetto agli altri.
 
-* I file nella cartella `lib` vengono caricati per primi.
+* Files in subdirectories are loaded before files in parent directories, so that
+  files in the deepest subdirectory are loaded first, and files in the root
+  directory are loaded last.
 
-* I file `main.*` vengono caricati dopo tutto il resto.
+* Within a directory, files are loaded in alphabetical order by
+  filename.
 
-* I file nelle sottocartelle vengono caricati prima dei file delle
-  cartelle padre, quindi i file nelle cartelle più nidificate vengono
-  caricati per prima (dopo `lib` però), e i file nella root sono
-  caricati per ultimi (ma prima di `main.*`).
+* After sorting as described above, all files under directories named `lib` are
+  moved before everything else (preserving their order).
 
-* Nella stessa cartella i file sono caricati in ordine alfabetico.
-
-Queste regole si sommano, quindi ad esempio all'interno di `lib` i file
-vengono caricati in ordine alfabetico; e se esistono più file
-denominati `main.js`, quelli nelle sottocartelle vengono caricati prima.
+* Finally, all files that match `main.*` are moved after everything else
+  (preserving their order).
 
 {{/better_markdown}}
 </template>
