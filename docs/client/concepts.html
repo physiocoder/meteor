@@ -151,19 +151,20 @@ usando [Meteor.startup](#meteor_startup), o spostando il codice che
 dipende da un particolare ordine di caricamento nei [packages](#usingpackages)
 dove si può esplicitamente controllare l'ordine di caricamento del
 proprio contenuto e dello stesso package rispetto agli altri.
+Ciò nonostante a volte è impossibile evitare di dipendere da un preciso ordine
+di caricamento. I file JavaScript e CSS vengono caricati seguendo queste regole:
 
-* Files in subdirectories are loaded before files in parent directories, so that
-  files in the deepest subdirectory are loaded first, and files in the root
-  directory are loaded last.
+* I file nelle sottodirectory vengono caricati prima dei file presenti nelle
+  directory padre, quindi i file nelle subdirectory più annidate sono i primi ad
+  essere caricati, mentre quelli nella directory principale sono gli ultimi.
 
-* Within a directory, files are loaded in alphabetical order by
-  filename.
+* Nella stessa cartella i file sono caricati in ordine alfabetico.
 
-* After sorting as described above, all files under directories named `lib` are
-  moved before everything else (preserving their order).
+* Dopo il riordino sopra descritto, tutti i file nella directory `lib` vengono
+  caricati prima di tutti gli altri (preservando il loro ordine).
 
-* Finally, all files that match `main.*` are moved after everything else
-  (preserving their order).
+* Infine tutti i file denominati `main.*` vengono caricati dopo tutti gli altri
+  (preservando il loro ordine).
 
 {{/better_markdown}}
 </template>
