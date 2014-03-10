@@ -47,7 +47,7 @@ In order to stay in sync with Meteor development, on my local repository (inspir
 
 4. If there are no update to original docs `merge` goes flawless with fast forward. DONE!
 
-5. If there were updates in original docs that conflicts with translation already done `git merge` output an error signaling files with such conflicts. To resolve conflict invoke `FileMerge` utility with:
+5. If there were updates in original docs that conflicts with translation already done, `git merge` outputs an error signaling files with such conflicts. To resolve conflicts invoke `FileMerge` utility with:
 
         git mergetool -t opendiff
 
@@ -72,4 +72,4 @@ I know, seems a little bit long and difficult but hope this could be of help as 
 
 ####UPDATE - Improvements
 
-Wondering if it's better to create the translation branch from `master` instead of `devel`: [Meteor guidelines](https://github.com/meteor/meteor/wiki/Contributing-to-Meteor) suggest to create a branch off `devel` because in the end is where they will (in case) merge your pull request. But since translation is a fork that will not be eventually merged maybe `master` is a better and more stable branch to base translations.
+Wondering if it's better to create the translation branch from `master` instead of `devel`: [Meteor guidelines](https://github.com/meteor/meteor/wiki/Contributing-to-Meteor) suggests to create a branch off `devel` because in the end it is where they will (in case) merge your pull request. But since translation is a fork that will not be eventually merged, maybe `master` is a better and more stable branch to base translations on.
