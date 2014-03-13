@@ -1,11 +1,23 @@
 ## v.NEXT
 
+* Add hooks to login process. This allows for rate limiting login
+  attempts, logging an audit trail, account lockout flags, etc. See:
+  http://docs.meteor.com/#accounts_validLoginAttempt  #1815
+
+* Add support for HTML email in `Accounts.emailTemplates`.  #1785
+
 * Use "faye-websocket" (0.7.2) npm module instead of "websocket" (1.0.8) for
   server-to-server DDP.
 
 * minimongo: Support {a: {$elemMatch: {x: 1, $or: [{a: 1}, {b: 1}]}}}  #1875
 
 * minimongo: Support {a: {$regex: '', $options: 'i'}}  #1874
+
+* minimongo: Fix sort implementation with multiple sort fields which each look
+  inside an array. eg, ensure that with sort key `{'a.x': 1, 'a.y': 1}`, the
+  document `{a: [{x: 0, y: 4}]}` sorts before
+  `{a: [{x: 0, y: 5}, {x: 1, y: 3}]}`, because the 3 should not be used as a
+  tie-breaker because it is not "next to" the tied 0s.
 
 * Upgraded dependencies
   - amplify: 1.1.2 (from 1.1.0)
