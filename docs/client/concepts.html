@@ -480,7 +480,7 @@ a video quando l'esecuzione del codice torna al loop degli eventi, o prima di
 invocare [`Deps.flush`](#deps_flush).
 
 Un'altro spinoso problema della applicazioni scritte a mano è la preservazione
-dell'elemento. Supponiamo che l'utente stia digitando in un elemento `<input>` e
+dell'elemento. Supponiamo che l'utente stia digitando in un elemento `<input> e
 che in quel momento l'area della pagina dove si trova venga ridisegnata.
 L'utente potrebbe trovarsi in una situazione spiacevole visto che il fuoco, la
 posizione del cursore, il testo parzialmente inserito e la sequenza per ottenere caratteri accentati vengono perse quando l'`<input>` viene ricreato.
@@ -499,27 +499,29 @@ continuerà ad aggiornare i figli riportando ogni cambio degli attributi.
 
 <h2 id="templates">Templates</h2>
 
-Meteor makes it easy to use your favorite HTML templating language,
-such as Handlebars or Jade, along with Meteor's live page update
-technology. Just write your template as you normally would, and Meteor
-will take care of making it update in realtime.
+Meteor permette di utilizzare con semplicità la libreria di gestione
+template preferita, come ad esempio Handlebars oppure Jade, insieme
+alla tecnologia di aggiornamento live della pagina. Basta scrivere il
+template nel modo che siamo soliti fare e Meteor gestirà gli
+aggiornamenti in tempo reale.
 
-To use this feature, create a file in your project with the `.html`
-extension. In the file, make a `<template>` tag and give it a
-`name` attribute. Put the template contents inside the tag. Meteor
-will precompile the template, ship it down to the client, and make it
-available as a function on the global `Template` object.
+Per sfruttare questa possibilità basta creare un file nel progetto con
+estensione `.html`. Nel file mettiamo un tag <template> e gli assegnamo
+un attributo di tipo `name`. Mettiamo il contenuto del template
+all'interno del tag. Meteor precompilerà il template, lo fornirà al
+client, rendendolo disponibile come funzione dell'oggetto globale
+`Template`.
 
 {{#note}}
-Today, the only templating system that has been packaged for Meteor is
-Handlebars. Let us know what templating systems you'd like to use with
-Meteor. Meanwhile, see the [Handlebars
-documentation](http://www.handlebarsjs.com/) and [Meteor Handlebars
-extensions](https://github.com/meteor/meteor/wiki/Handlebars).
+Ad oggi l'unica libreria di gestione template pacchettizzata per l'uso
+con Meteor è Handlebars. Fatecu sapere quale altra libreria di gestione
+template vorreste usare con Meteor. Intanto potete consultare la
+[documentazione di Handlebars](http://www.handlebarsjs.com/) e le
+[estensioni di Handlebars per Meteor](https://github.com/meteor/meteor/wiki/Handlebars).
 {{/note}}
 
-A template with a `name` of `hello` is rendered by calling the
-function `Template.hello`, passing any data for the template:
+Un template con `name` uguale ad `hello` viene disegnato invocando la
+funzione `Template.hello`, passando i dati per il template:
 
     <!-- in myapp.html -->
     <template name="hello">
@@ -530,18 +532,19 @@ function `Template.hello`, passing any data for the template:
     > Template.hello({first: "Alyssa", last: "Hacker"});
      => "<div class="greeting">Hello there, Alyssa Hacker!</div>"
 
-This returns a string. To use the template along with the [`Live
-HTML`](#livehtml) system, and get DOM elements that update
-automatically in place, use [`Meteor.render`](#meteor_render):
+Che ritorna una stringa. Per usare il template insieme al sistema di
+[`Live HTML`](#livehtml), ed avere elementi del DOM che si aggiornano
+automaticamente sul posto, bisogna usare [`Meteor.render`](#meteor_render):
 
     Meteor.render(function () {
       return Template.hello({first: "Alyssa", last: "Hacker"});
     })
       => automatically updating DOM elements
 
-The easiest way to get data into templates is by defining helper
-functions in JavaScript. Just add the helper functions directly on the
-`Template.[template name]` object. For example, in this template:
+Il modo più semplice per mettere dei dati nei template è attraverso la
+definizione di funzioni helper in Javascript. Basta aggiungere le
+funzioni helper direttamente all'oggetto `Template.[template name]`.
+Ad esempio in questo template:
 
     <template name="players">
       {{dstache}}#each topScorers}}
@@ -549,21 +552,23 @@ functions in JavaScript. Just add the helper functions directly on the
       {{dstache}}/each}}
     </{{! }}template>
 
-instead of passing in `topScorers` as data when we call the
-template function, we could define a function on `Template.players`:
+invece di passare `topScorers` come parametro quando chiamiamo la
+funzione del template, potremmo definire una funzione in
+`Template.players`:
 
     Template.players.topScorers = function () {
       return Users.find({score: {$gt: 100}}, {sort: {score: -1}});
     };
 
-In this case, the data is coming from a database query. When the
-database cursor is passed to `#each`, it will wire up all of the
-machinery to efficiently add and move DOM nodes as new results enter
-the query.
+In questo caso i dati provengono da una quary al database. Quando il
+cursore del database viene passato ad `#each`, vengono eseguite tutte
+le operazioni per aggiungere e spostare i nodi del DOM man mano che i
+risultati popolano la query.
 
-Helpers can take arguments, and they receive the current template context data
-in `this`. Note that some block helpers change the current context (notably
-`each` and `with`):
+Gli helper possono accettare argomenti, e accedono al contesto dati del
+template di riferimento tramite `this`. Si noti che alcuni helper che
+definiscono dei blocchi cambiano il contesto dati in uso (in particolare
+`each` e `with`): 
 
     // in a JavaScript file
     Template.players.leagueIs = function (league) {
@@ -583,22 +588,23 @@ in `this`. Note that some block helpers change the current context (notably
     </{{! }}template>
 
 {{#note}}
-Handlebars note: `{{dstache}}#if leagueIs "junior"}}` is
-allowed because of a Meteor extension that allows nesting a helper
-in a block helper. (Both `if` and `leagueIs` are
-technically helpers, and stock Handlebars would not invoke
-`leagueIs` here.)
+Nota su Handlebars: `{{dstache}}#if leagueIs "junior"}}` qui può essere
+usato grazie ad una estensione per Meteor che permette l'annidamento di
+un helper dentro un altro helper che definisce un blocco. (Sia `if` che
+`leagueIs` sono helper, tecnicamente, e Handlebars normalmente non
+invocherebbe `leagueIs` in questo caso.)
 {{/note}}
 
-Helpers can also be used to pass in constant data.
+Gli helper possono essere usati anche per passare costanti.
 
     // Works fine with {{dstache}}#each sections}}
     Template.report.sections = ["Situation", "Complication", "Resolution"];
 
-Finally, you can use an `events` declaration on a template function to set up a
-table of event handlers. The format is documented at [Event
-Maps](#eventmaps). The `this` argument to the event handler will be
-the data context of the element that triggered the event.
+Infine si può usare la dichiarazione `events` nella funzione di un
+template per definire una tabella di gestori eventi. Il formato è
+documentato in [Event Maps](#eventmaps). L'argomento `this` per il
+gestore eventi sarà il contesto dati dell'elemento che ha scatenato
+l'evento.
 
     <!-- myapp.html -->
     <template name="scores">
@@ -620,10 +626,10 @@ the data context of the element that triggered the event.
       }
     });
 
-Putting it all together, here's an example of how you can inject
-arbitrary data into your templates, and have them update automatically
-whenever that data changes. See [Live HTML](#livehtml) for further
-discussion.
+Mettendo insieme quanto abbiamo detto, ecco un esempio di come si
+possono inserire dati nel template a nostro piacimento, ed ottenere
+un aggiornamento automatico ogni volta che i dati cambiano. Si veda
+[Live HTML](#livehtml) per ulteriori approfondimenti.
 
     <!-- in myapp.html -->
     <template name="forecast">
