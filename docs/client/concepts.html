@@ -803,63 +803,65 @@ generare un errore.
 
 <h2 id="deploying">Deploying</h2>
 
-Meteor is a full application server.  We include everything you need
-to deploy your application on the internet: you just provide the JavaScript,
-HTML, and CSS.
+Meteor è un ambiente completo per scrivere applicazioni. Abbiamo incluso
+tutto ciò che serve per distribuire l'applicazione su internet: basta
+scrivere il codice JavaScript, HTML e CSS.
 
-<h3 class="nosection">Running on Meteor's infrastructure</h3>
+<h3 class="nosection">Usare l'infrastruttura di Meteor</h3>
 
-The easiest way to deploy your application is to use `meteor
-deploy`.  We provide it because it's what, personally, we've always
-wanted: an easy way to take an app idea, flesh it out over a weekend,
-and put it out there for the world to use, with nothing getting in the
-way of creativity.
+Il modo più semplice per effettuare il deploy dell'applicazione (cioè
+farla girare e renderla raggiungibile dagli utenti) è utilizzare il
+comando `meteor deploy`. Abbiamo creato questa possibilità perché
+personalmente è ciò che avremmo sempre voluto: una maniera semplice per
+partire dall'idea di un'applicazione, lavorarci su nel weekend, e
+renderla disponibile a tutto il mondo, senza ostacoli alla creatività. 
 
     $ meteor deploy myapp.meteor.com
 
-Your application is now available at myapp.meteor.com.  If
-this is the first time deploying to this hostname, Meteor creates a
-fresh empty database for your application.  If you want to deploy an
-update, Meteor will preserve the existing data and just refresh the
-code.
+Ora l'applicazione è disponibile all'indirizzo myapp.meteor.com. Se è
+la prima volta che installiamo l'applicazione a questo indirizzo,
+Meteor crea un nuovo database vuoto. Se invece stiamo aggiornando
+l'applicazione, Meteor conserverà i dati esistenti aggiornando solo il
+codice.
 
-You can also deploy to your own domain.  Just set up the hostname you
-want to use as a CNAME to `origin.meteor.com`,
-then deploy to that name.
+Si può anche installare l'applicazione su un dominio personalizzato.
+E' sufficiente configurare lo CNAME del dominio in maniera che punti a
+`origin.meteor.com` e poi fare il deploy su quel dominio.
 
     $ meteor deploy www.myapp.com
 
-We provide this as a free service so you can try Meteor.  It is also
-helpful for quickly putting up internal betas, demos, and so on.
+Forniamo questo servizio gratuitamente, in modo da poter provare Meteor.
+E' anche molto utile per mettere rapidamente online una beta ad uso interno,
+una demo, e così via.
 
-<h3 class="nosection">Running on your own infrastructure</h3>
+<h3 class="nosection">Usare una infrastruttura proprietaria</h3>
 
-You can also run your application on your own infrastructure, or any
-other hosting provider like Heroku.
+Si può installare l'applicazione anche utilizzando una infrastruttura
+proprietaria oppure usando un fornitore come Heroku.
 
-To get started, run
+Per iniziare eseguiamo
 
     $ meteor bundle myapp.tgz
 
-This command will generate a fully-contained Node.js application in the form of
-a tarball.  To run this application, you need to provide Node.js 0.10 and a
-MongoDB server.  (The current release of Meteor has been tested with Node
-0.10.25; older versions contain a serious bug that can cause production servers
-to stall.) You can then run the application by invoking node, specifying the
-HTTP port for the application to listen on, and the MongoDB endpoint.  If
-you don't already have a MongoDB server, we can recommend our friends at
+Questo comando genererà un'intera applicazione basata su Node.js contenuta
+in una [tarball](http://it.wikipedia.org/wiki/Tar_(software)). Per lanciare
+l'applicazione deve essere disponibile Node.js versione 0.10 ed un server MongoDB. (L'attuale versione di Meteor è stata
+testata con Node 0.10.25; le versioni precedenti contengono un bug che
+potrebbe impallare i server in produzione). A questo punto si può lanciare
+l'applicazione eseguendo node, specificando la porta HTTP che l'applicazione
+deve ascoltare e l'istanza di MongoDB. Se non si dispone già di un server
+MongoDB raccomandiamo di dare un'occhiata ai nostri amici di
 [MongoHQ](http://mongohq.com).
 
     $ PORT=3000 MONGO_URL=mongodb://localhost:27017/myapp node bundle/main.js
 
-Other packages may require other environment variables (for example, the `email`
-package requires a `MAIL_URL` environment variable).
+Altri package potrebbero necessitare di altre variabili di ambiente (ad
+esempio il package `email` ha bisogno di una variabile di ambiente `MAIL_URL`).
 
 {{#warning}}
-For now, bundles will only run on the platform that the bundle was
-created on.  To run on a different platform, you'll need to rebuild
-the native packages included in the bundle.  To do that, make sure you
-have `npm` available, and run the following:
+Attualmente un bundle funziona solo in un ambiente uguale a quello in cui
+è stato creato. Per girare in un diverso ambiente è necessario ricostruire
+i package nativi inclusi nel bundle. Per farlo dobbiamo disporre di `npm` ed eseguire:
 
     $ cd bundle/programs/server/node_modules
     $ rm -r fibers
