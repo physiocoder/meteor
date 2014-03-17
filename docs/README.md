@@ -31,3 +31,7 @@ Nello scrivere la traduzione sono state seguite alcune norme:
 
 - Il plurale delle parole inglesi mantenute in italiano è stato quasi
   sempre eliminato
+
+  #### Casi perticolari
+
+  - Namespace: tenuto in inglese ed aggiunto un link alla [pagina di wikipedia in italiano che spiega cos'è](http://it.wikipedia.org/wiki/Namespace)
