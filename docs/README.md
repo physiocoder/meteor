@@ -36,4 +36,4 @@ Nello scrivere la traduzione sono state seguite alcune norme:
 
 - Namespace: mantenuto in inglese ed aggiunto un link alla [pagina di wikipedia in italiano che spiega cos'è](http://it.wikipedia.org/wiki/Namespace)
 - Tarball: mantenuto in inglese ed aggiunto un link alla [pagina di wikipedia in italiano che spiega cos'è](http://it.wikipedia.org/wiki/Tar_(software))
-- lvalues: mantennuto in inglese ed aggiunto un link alla [pagina di wikipedia in italiano che spiega cos'è](http://it.wikipedia.org/wiki/Valore_(informatica))
+- lvalues: mantenuto in inglese ed aggiunto un link alla [pagina di wikipedia in italiano che spiega cos'è](http://it.wikipedia.org/wiki/Valore_(informatica))
