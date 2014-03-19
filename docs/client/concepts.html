@@ -656,7 +656,7 @@ un aggiornamento automatico ogni volta che i dati cambiano. Si veda
 <template name="packages_concept">
 {{#better_markdown}}
 
-  <h2 id="utilizzodeipackages">Utilizzo dei packages</h2>
+  <h2 id="utilizzodeipackage">Utilizzo dei package</h2>
 
 Tutte le caratteristiche che abbiamo visto finora sono implementate
 utilizzando i package standard di Meteor. Ciò è possibile grazie allo
@@ -875,102 +875,112 @@ i package nativi inclusi nel bundle. Per farlo dobbiamo disporre di `npm` ed ese
 <template name="packages_writing">
 {{#better_markdown}}
 
-  <h2 id="writingpackages">Writing packages</h2>
+  <h2 id="scritturadipackage">Scrittura di package</h2>
 
-The Meteor package format isn't officially documented and will change
-before Meteor 1.0. But that hasn't stopped people like you from
-creating hundreds of packages by reading the source code of existing
-packages and following the model. If you do decide to create your own
-packages, you will have to do some detective work, but here are some
-quick tips:
+Il formato dei package non è documentato ufficialmente e cambierà prima
+del rilascio di Meteor 1.0. Questo però non ha impedito agli sviuppatori
+come te di creare centinaia di package leggendo il codice sorgente dei
+package esistenti e seguendone l'esempio. Quindi se decidete di scrivere
+un package dovrete lavorare un po' da detective, ma in ogni caso ecco
+alcuni rapidi suggerimenti:
 
-* A package is simply a directory with a `package.js` file in it. Look in the
-  [`packages` directory of the Meteor source
-  tree](https://github.com/meteor/meteor/tree/master/packages/) for example
-  `package.js` files. The format and name of the `package.js` file will change
-  significantly before Meteor 1.0, but the functionality will be basically the
-  same even though the syntax is different, so it will be easy to port your
-  code.
+* Un package è semplicemente una cartella contenente un file `package.js`.
+  Si può guardare la
+  [cartella `packages` nel codice sorgente di Meteor](https://github.com/meteor/meteor/tree/master/packages/)
+  per esempi di file `package.js`. Il nome ed il formato del file `package.js`
+  cambierà in maniera significativa prima di Meteor 1.0, ma la funzionalità
+  rimarrà in larga parte invariata, anche con una sintassi diversa, e dunque
+  sarà semplice convertire il codice.
 
-* Packages explicitly list all of their source files using `api.add_files`, and
-  the files are loaded exactly in the order specified. (This is different from
-  apps, where Meteor scans a directory tree to find the source files.)  Don't
-  forget to include any build plugin packages (such as `coffeescript` or, if
-  using HTML templates, `templating`) that you require.
+* I package elencano in maniera esplicita i file che compongono il loro codice
+  sorgente usando `api.add_files`, i file vengono caricati esattamente
+  nell'ordine specificato. (E' diverso da ciò che accade nelle applicazioni,
+  dove Meteor controlla l'albero delle cartelle per cercare i file
+  sorgenti). Non bisogna dimenticare di includere eventuali package che sono
+  plugin di compilazione (come `coffescript` oppure `templating` se si usano
+  i template HTML).
 
-* Exporting a symbol from your package (see
-  [Namespacing](#namespacing)) is accomplished with an `api.export` call
-  from inside your `on_use` handler.
+* Per rendere visibili gli oggetti (export) all'esterno del package (si veda
+  [Namespacing](#namespacing)) bisogna invocare `api.export` dall'interno
+  del gestore `on_use`.
 
-* An esoteric point about exports: they are not lvalues. You can't set
-  an exported variable to a new value after exporting it. If you
-  export `a = {name: 'alice'}` then you can change `a.name` anytime
-  you want, but if after startup you set `a` to a whole new object
-  then the packages that import `a` won't see the change. Since your
-  exports are most always objects or functions, this is hardly ever an
-  issue.
+* Un chiarimento su un aspetto oscuro delle exports: non sono
+  [lvalues](http://it.wikipedia.org/wiki/Valore_(informatica). Non si può
+  cioè assegnare un valore arbitrario ad una variabile esportata dopo averla
+  esportata. Se si esporta `a = {name: 'alice'}` possiamo cambiare il valore
+  di `a.name` quando vogliamo, ma se dopo l'avvio assegnamo ad `a` un oggetto
+  nuovo i package che importano `a` non vedranno la modifica. Poichè le export
+  sono quasi sempre oggetti o funzioni, difficilmente potrà mai essere un
+  problema.
 
-* Packages can use [npm modules](https://npmjs.org/). Use `Npm.depends` in your
-  `package.js` to list the npm modules that you need and the specific
-  versions that you want to use. Then use `Npm.require` inside your
-  package to pull in the modules when you need them. Meteor strives to
-  have 100% repeatable builds so that everyone on your team is always
-  running the same code, and that's why you must explicitly lock your
-  npm dependencies to specific versions. Behind the scenes, Meteor
-  will use `npm shrinkwrap` to also lock down the versions of the
-  transitive dependencies of all of the npm modules that you use.
+* I package possono usare i [moduli npm](https://npmjs.org/). Si utilizza
+  `Npm.depends` in `package.js` per elencare i moduli npm necessari e le
+  versioni specifiche che si desidera utilizzare. Poi si usa `Npm.require`
+  nel codice del package per scaricare i moduli al momento del bisogno.
+  Meteor si preoccupa di far in modo che tutti i componenti del team
+  di sviluppo eseguano lo stesso codice e dunque occorre poter
+  ricompilare l'applicazione in maniera 100% ripetibile, ed è per questo
+  che bisogna indicare le versioni dei moduli npm da cui dipende il codice.
+  Dietro le quinte, Meteor usa `npm shrinkwrap` per bloccare anche le
+  versioni delle dipendenze indirette di tutti i moduli npm in uso.
 
-* Whenever your package changes, Meteor will rebuild it (compiling
-  non-JavaScript source files, fetching npm dependencies, constructing
-  namespace wrappers, and so on). The built package will be cached and
-  rebuilt only when a source file changes (tracked by SHA1) or when
-  other dependencies such as build plugins change. To force a rebuild
-  you can use the undocumented command `meteor rebuild-all`, but this
-  should never be necessary (if it is, please send a
-  [bug report](https://github.com/meteor/meteor/blob/devel/Contributing.md#filing-bug-reports)!).
+* Quando modifichiamo un package, Meteor lo ricostruisce (compilando il
+  codice non-JavaScript, recuperando le dipendeze npm, inserendo il codice
+  per incapsulare il namespace e così via). Il package costruito viene
+  memorizzaro in una cache e ricostruito solo quando modifichiamo un file
+  sorgente (controllato con uno SHA1) oppure quando altre dipendenze,
+  come ad esempio i plugin di sviluppo, cambiano. Per forzare una
+  ricostruzione si può usare il comando non documentato `meteor rebuild-all`
+  anche se non dovrebbe mai essere necessario (se invece lo fosse vi
+  preghiamo di segnalarcelo con un [bug report](https://github.com/meteor/meteor/blob/devel/Contributing.md#filing-bug-reports)!).
 
-* Build plugins are created with `_transitional_registerBuildPlugin`,
-  an API that is very much in flux. See the `coffeescript` package for
-  an example. Build plugins are fully-fledged Meteor programs in their
-  own right and have their own namespace, package dependencies, source
-  files and npm requirements. The old `register_extension` API is
-  removed.
+* I plugin di sviluppo e compilazione sono scritti utilizzando
+  `_transitional_registerBuildPlugin`, una API ancora fortemente in
+  divenire. Si veda il package `coffescript` come esempio. I plugin
+  di compilazione sono in tutto e per tutto eseguibili Meteor autonomi
+  e con un proprio namespace, dipendenze da altri package, file sorgenti
+  a utilizzo di moduli npm. La vecchia API `register_extension` non è
+  più disponibile.
 
-* It is possible to create weak dependencies between packages. If
-  package A has a weak dependency on package B, it means that
-  including A in an app does not force B to be included too &mdash;
-  but, if B _is_ included, say by the app developer or by another
-  package, then B will load before A. You can use this to make
-  packages that optionally integrate with or enhance other packages if
-  those packages are present. To create a weak dependency, pass
-  `{weak: true}` as the third argument to `api.use`. When you weakly
-  depend on a package you don't see its exports. You can detect if
-  the possibly-present weakly-depended-on package is there by seeing
-  if `Package.foo` exists, and get its exports from the same place.
+* Si possono creare dipendenze di tipo "debole" o "opzionale" tra package.
+  Se il package A ha una dipendenza debole dal package B significa che
+  l'inclusione di A nell'applicazione non forzerà automaticamente
+  l'inclusione di B &mdash; ma se B _viene_ esplicitamente inclusa dallo
+  sviluppatore o da un altro package, allora B sarà caricata prima di A.
+  Si può usare questo meccanismo per creare package che si integrano o
+  migliorano le funzionalità di altri package solo se sono presenti.
+  Per creare una dipendenza debole bisogna passare `{weak: true}` come
+  terzo parametro di `api.use`. Quando si ha una dipendenza debole da un
+  package non sono visibili le sue export. Si può controllare la possibile
+  presenza di un package "da cui dipendiamo debolmente“ controllando se
+  `Package.foo` esiste, e sempre da li accedere alle sue export.
 
-* It is also possible to create unordered dependencies by passing
-  `{unordered: true}`. An unordered dependency is the exact opposite
-  of a weak dependency. If A has an unordered dependency on B, then
-  including A forces B to be included as well, but doesn't require B
-  to load before A. This is occasionally useful for resolving circular
-  dependencies.
+* E' anche possibile creare dipendenze "non ordinate" passando
+  `{unordered: true}`. Una dipendenza non ordinata è l'esatto opposto
+  di una dipendenza debole. Se A dipende in maniera non ordinata da B
+  allora l'inclusione di A forza l'inclusione di B, ma non obbliga B
+  ad essere caricata prima di A. A volte può essere utile per risolvere
+  dipendenze circolari.
 
-* The build system also supports package implication. If package A
-  implies package B, then it means that when someone depends on
-  package A, it's as if they also depended on package B as well. In
-  particular, they get B's exports. This is done with `api.imply` and
-  can be used to create umbrella packages such as
-  `standard-app-packages` that are a shortcut for pulling in a set of
-  packages, or it can be helpful in factoring common code out of a set
-  of packages as with `accounts-base`.
+* Meteor supporta anche le dipendenze implicite nei package. Se il package
+  A dipende implicitamente dal package B, allora quando qualcuno dipende
+  dal package A è come se dipendesse anche (implicitamente) da B.
+  Significa in particolare che ha accesso alle export di B. Per realizzare
+  una dipendenza implicita si usa `api.imply` e la si può usare per creare
+  package ombrello come `standard-app-package` che sono una scorciatoia per
+  includere un set di package, oppure un modo per raggruppare in un solo
+  package codice presente in diversi package ma con la stessa funzione come
+  per `accounts-base`.
 
-* The build system understands the idea of native code and has a
-  system of architecture names to ensure that packages that are
-  specific to one architecture aren't run on the wrong
-  architecture. For example, if you include an npm module that has a
-  native extension, your built Meteor package will be specific to your
-  machine architecture, but if not your built Meteor package will be
-  portable.
+* Quando Meteor costruisce l'applicazione è consapevole del fatto che ciò
+  che è scritto in codice nativo per una architettura non può funzionare su
+  architetture diverse, e per questo possiede un sistema di nomi di
+  architetture per essere sicuro che un package scritto per una determinata
+  architettura non si cerchi di farlo funzionare su un'altra. Ad esempio se
+  includiamo un modulo npm che ha una estensione nativa, il package costruito
+  da Meteor sarà specifico per l'hardware della nostra macchina, ma se non
+  ha estensioni native il package creato da Meteor sarà portabile su altre
+  architetture.
 
 {{/better_markdown}}
 </template>

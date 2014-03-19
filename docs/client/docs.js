@@ -104,10 +104,10 @@ var toc = [
     "Reattività",
     "Live HTML",
     "Templates",
-    "Utilizzo dei packages",
+    "Utilizzo dei package",
     "Namespacing",
     "Deploying",
-    "Scrittura di packages"
+    "Scrittura di package"
   ],
 
   "API", [
