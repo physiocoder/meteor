@@ -396,7 +396,7 @@ conseguenza di introdurre bug.
 Queste funzioni in Meteor permettono di scrivere codice che sarà eseguito in
 maniera reattiva:
 
-* [Templates](#livehtmltemplates)
+* [Templates](#templatehtmllive)
 * [`Deps.autorun`](#deps_autorun)
 * [`UI.render`](#ui_render) and [`UI.renderWithData`](#ui_renderwithdata)
 
@@ -429,44 +429,49 @@ comprensibile. Lo si può usare per implementare nuove sorgenti dati reattive.
 <template name="livehtmltemplates">
 {{#markdown}}
 
-<h2 id="livehtmltemplates">Live HTML templates</h2>
+<h2 id="templatehtmllive">Template HTML live</h2>
 
-HTML templating is central to web applications. With Blaze, Meteor's live
-page update technology, you can render your HTML _reactively_, meaning
-that it will update automatically to track changes in the data used to
-generate it.
+I template HTML sono fondamentali per le applicazioni web. Grazie a Blaze, la
+tecnologia di aggiornamento live delle pagine di Meteor, possiamo visualizzare
+il codice HTML in maniera _reattiva_, e questo significa che si aggiornerà
+automaticamente in base alle modifiche ai dati usati per generarlo.
 
 Meteor makes it easy to use your favorite HTML templating language along with
 Meteor's live page update technology. Just write your template as you normally
 would, and Meteor will take care of making it update in realtime.
+La tecnologia di aggiornamento live delle pagine di Meteor può facilmente essere
+integrata con la libreria di gestione di template HTML che si preferisce. Basta
+scrivere il nostro template come faremmo normalmente e Meteor si preoccuperà di
+mantenerlo sempre aggiornato in tempo reale.
 
-Meteor ships with a templating language called
+Meteor integra un linguaggio per la scrittura di template chiamato
 [Spacebars](https://github.com/meteor/meteor/blob/devel/packages/spacebars/README.md),
-inspired by [Handlebars](http://handlebarsjs.com/).  It shares some of the
-spirit and syntax of Handlebars, but it has been tailored to produce reactive
-Meteor templates when compiled.
+ispirato da [Handlebars](http://handlebarsjs.com/). Segue in gran parte le
+stesse convenzioni e la stessa sintassi di Handelbars, ma produce template
+reattivi quando viene compilato.
 
 {{#note}}
-  Today, the only templating system that ships with Meteor is Spacebars, though
-  our community has created packages for other languages such as
+  Ad oggi l'unico sistema di templating integrato in Meteor è Spacebar, ma la
+  comunità degli sviluppatori ha già creato package per altri linguaggi come
   [Jade](https://atmospherejs.com/package/jade).
 {{/note}}
 
-To define templates, create a file in your project with the `.html`
-extension. In the file, make a `<template>` tag and give it a
-`name` attribute. Put the template contents inside the tag. Meteor
-will precompile the template, ship it down to the client, and make it
-available as on the global `Template` object.
+Per costruire un template basta creare un file nel progetto con
+estensione `.html`. Nel file mettiamo un tag `<template>` e gli assegnamo
+un attributo di tipo `name`. Mettiamo il contenuto del template
+all'interno del tag. Meteor precompilerà il template, lo fornirà al
+client, rendendolo disponibile come funzione dell'oggetto globale
+`Template`.
 
-When you app is loaded, it automatically renders the special template called
-`<body>`, which is written using the `<body>` element instead of a
-`<template>`. You insert a template inside another template by using the
-`{{dstache}}> inclusion}}` operator.
+Quando l'applicazione viene caricata, mostra a video il template speciale
+chiamato `<body>`, che abbiamo creato usando l'elemento `<body>` invece di
+`<template>`. Per inserire un template dentro un altro template usiamo
+l'operatore `{{dstache}}> inclusion}}`.
 
-The easiest way to get data into templates is by defining helper
-functions in JavaScript. Just add the helper functions directly on the
-`Template.`*templateName* object. Putting it all together:
-
+Il modo più semplice per mettere dei dati nei template è attraverso la
+definizione di funzioni helper in Javascript. Basta aggiungere le
+funzioni helper direttamente all'oggetto `Template.`*templateName*.
+Vediamo come si fa:
 
     <!-- in myapp.html -->
     <body>
@@ -493,7 +498,8 @@ functions in JavaScript. Just add the helper functions directly on the
      => "<h1>Today's weather!</h1> <div>It'll be cool and dry tonight</div>"
 
 
-To iterate over an array or database cursor, use `{{dstache}}#each}}`:
+Per leggere i dati di un array o di un cursore di database si usa
+`{{dstache}}#each}}`:
 
     <!-- in myapp.html -->
     <template name="players">
@@ -508,14 +514,14 @@ To iterate over an array or database cursor, use `{{dstache}}#each}}`:
     };
 
 In questo caso i dati provengono da una quary al database. Quando il
-cursore del database viene passato ad `#each`, vengono eseguite tutte
-le operazioni per aggiungere e spostare i nodi del DOM man mano che i
+cursore del database viene passato ad `{{dstache}}#each}}`, vengono eseguite
+tutte le operazioni per aggiungere e spostare i nodi del DOM man mano che i
 risultati popolano la query.
 
 Gli helper possono accettare argomenti, e accedono al contesto dati del
 template di riferimento tramite `this`. Si noti che alcuni helper che
 definiscono dei blocchi cambiano il contesto dati in uso (in particolare
-`each` e `with`): 
+`{{dstache}}#each` e `{{dstache}}#with`): 
 
     // in a JavaScript file
     Template.players.leagueIs = function (league) {
@@ -534,7 +540,7 @@ definiscono dei blocchi cambiano il contesto dati in uso (in particolare
       {{dstache}}/each}}
     {{lt}}/template>
 
-Helpers can also be used to pass in constant data.
+Gli helper possono essere usati anche per passare costanti.
 
     // Works fine with {{dstache}}#each sections}}
     Template.report.sections = ["Situation", "Complication", "Resolution"];
@@ -565,8 +571,8 @@ l'evento.
       }
     });
 
-For more details about Spacebars, read [the Spacebars
-README](https://github.com/meteor/meteor/blob/devel/packages/spacebars/README.md).
+Per ulteriori dettagli su Spacebars si legga
+[il README di Spacebars](https://github.com/meteor/meteor/blob/devel/packages/spacebars/README.md).
 
 {{/markdown}}
 </template>
