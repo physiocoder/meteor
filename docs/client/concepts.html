@@ -11,8 +11,7 @@ Meteor è tutto ciò che avremmo voluto per scrivere queste applicazioni.
 {{> structure }}
 {{> data }}
 {{> reactivity }}
-{{> livehtml }}
-{{> templates }}
+{{> livehtmltemplates }}
 {{> packages_concept }}
 {{> namespacing }}
 {{> deploying }}
@@ -21,7 +20,7 @@ Meteor è tutto ciò che avremmo voluto per scrivere queste applicazioni.
 
 <template name="whatismeteor">
 
-{{#better_markdown}}
+{{#markdown}}
 
 <h2 id="cosmeteor">Cos'è Meteor?</h2>
 
@@ -68,11 +67,11 @@ un'applicazione che gestisce ed installa i package di Atmosphere.
 In Meteor 1.0, `meteor` incorporerà il pieno supporto ad Atmosphere.
 {{/note}}
 
-{{/better_markdown}}
+{{/markdown}}
 </template>
 
 <template name="structure">
-{{#better_markdown}}
+{{#markdown}}
 
 <h2 id="strutturadiunapp">Struttura di una applicazione</h2>
 
@@ -166,11 +165,11 @@ di caricamento. I file JavaScript e CSS vengono caricati seguendo queste regole:
 * Infine tutti i file denominati `main.*` vengono caricati dopo tutti gli altri
   (preservando il loro ordine).
 
-{{/better_markdown}}
+{{/markdown}}
 </template>
 
 <template name="data">
-{{#better_markdown}}
+{{#markdown}}
 
 <h2 id="datiesicurezza">Dati e sicurezza</h2>
 
@@ -356,11 +355,11 @@ aggiungere il package <code>meteor add [audit-argument-checks](#auditargumentche
 tutti i metodi e le funzioni di pubblicazione che non fanno il `check`ing
 produrranno un'eccezione.
 
-{{/better_markdown}}
+{{/markdown}}
 </template>
 
 <template name="reactivity">
-{{#better_markdown}}
+{{#markdown}}
 
 <h2 id="reattivit">Reattività</h2>
 
@@ -397,9 +396,9 @@ conseguenza di introdurre bug.
 Queste funzioni in Meteor permettono di scrivere codice che sarà eseguito in
 maniera reattiva:
 
-* [Templates](#templates)
-* [`Meteor.render`](#meteor_render) e [`Meteor.renderList`](#meteor_renderlist)
+* [Templates](#livehtmltemplates)
 * [`Deps.autorun`](#deps_autorun)
+* [`UI.render`](#ui_render) and [`UI.renderWithData`](#ui_renderwithdata)
 
 Mentre le sorgenti dati reattive che possono scatenare la riesecuzione sono:
 
@@ -424,138 +423,86 @@ Tutto ciò in Meteor è
 in un package chiamato [`Deps`](#deps) piuttosto piccolo e facilmente
 comprensibile. Lo si può usare per implementare nuove sorgenti dati reattive.
 
-{{/better_markdown}}
+{{/markdown}}
 </template>
 
-<template name="livehtml">
-{{#better_markdown}}
+<template name="livehtmltemplates">
+{{#markdown}}
 
-<h2 id="livehtml">Live HTML</h2>
+<h2 id="livehtmltemplates">Live HTML templates</h2>
 
-I template HTML sono fondamentali per le applicazioni web. Con la tecnologia di
-aggiornamento live delle pagine possiamo visualizzare il codice HTML in maniera _reattiva_, e questo significa che si aggiornerà automaticamente in base alle
-modifiche ai dati usati per generarlo.
+HTML templating is central to web applications. With Blaze, Meteor's live
+page update technology, you can render your HTML _reactively_, meaning
+that it will update automatically to track changes in the data used to
+generate it.
 
-Questa caratteristica opzionale funziona con qualsiasi libreria di templating
-HTML, o anche con l'HTML generato manualmente in JavaScript. Ecco un esempio:
+Meteor makes it easy to use your favorite HTML templating language along with
+Meteor's live page update technology. Just write your template as you normally
+would, and Meteor will take care of making it update in realtime.
 
-    var fragment = Meteor.render(
-      function () {
-        var name = Session.get("name") || "Anonymous";
-        return "<div>Hello, " + name + "</div>";
-      });
-    document.body.appendChild(fragment);
-
-    Session.set("name", "Bob"); // page updates automatically!
-
-[`Meteor.render`](#meteor_render) si aspetta una funzione di rendering, cioè
-una funzione che ritorna una stringa contenente HTML. Ritorna un
-`DocumentFragment` che si aggiorna automaticamente. Quando i dati usati dalla
-funzione di rendering variano viene eseguita nuovamente. I nodi del DOM del
-`DocumentFragment` aggiornano se stessi sul posto, non importa in quale punto
-della pagina sono stati messi. E' completamente automatico.
-[`Meteor.render`](#meteor_render) usa una [elaborazione reattiva](#reattivit) per scoprire quali dati sono usati dalla funzione di rendering. 
-
-In genere però, queste funzioni non si usano direttamente &mdash; ma si usa
-il package preferito per la gestione dei template, come Handlebars o Jade. Le
-funzioni `render` e `renderList` sono messe a disposizione di chi desidera
-implementare nuove librerie di templating. 
-
-Meteor esegue gli aggiornamenti all'interfaccia solo quando il codice
-dell'applicazione non è in esecuzione. In questo modo siamo sicuri che il DOM
-non ci si modificherà da sotto i piedi. Ma a volte ci interessa il contrario.
-Ad esempio se abbiamo appena inserito un record nel database potremmo voler
-forzare il DOM ad aggiornarsi in modo da poterci riferire ai nuovi elementi
-da una libreria come jQuery. In questo caso usiamo [`Deps.flush`](#deps_flush)
-per aggiornare il DOM immediatamente. 
-
-Quando gli elementi del DOM con aggiornamento live vengono rimossi dalla
-pagina, vengono automaticamente resettati &mdash; le callback vengono
-disattivate e le query al database interrotte, e non si aggiornano più. Per
-questo non ci sarà mai bisogno di preoccuparsi dei [template
-zombie](http://lostechies.com/derickbailey/2011/09/15/zombies-run-managing-page-transitions-in-backbone-apps/)
-che infestano la logica di aggiornamento scritta a mano. Per proteggere gli
-elementi da questo meccanismo di reset bisogna esser certi che siano presenti
-a video quando l'esecuzione del codice torna al loop degli eventi, o prima di
-invocare [`Deps.flush`](#deps_flush).
-
-Un altro spinoso problema delle applicazioni scritte a mano è la preservazione
-dell'elemento. Supponiamo che l'utente stia digitando in un elemento `<input> e
-che in quel momento l'area della pagina dove si trova venga ridisegnata.
-L'utente potrebbe trovarsi in una situazione spiacevole visto che il fuoco, la
-posizione del cursore, il testo parzialmente inserito e la sequenza per ottenere caratteri accentati vengono perse quando l'`<input>` viene ricreato.
-
-E' un altro problema che Meteor risove per noi. Quando i template vengono
-ridisegnati si possono specificare gli elementi da preservare usando nel
-template la direttiva [`preserve`](#template_preserve). Meteor preserverà
-questi elementi quando il template che li contiene viene ridisegnato, ma
-continuerà ad aggiornare i figli riportando ogni cambio degli attributi. 
-
-{{/better_markdown}}
-</template>
-
-<template name="templates">
-{{#better_markdown}}
-
-<h2 id="templates">Templates</h2>
-
-Meteor permette di utilizzare con semplicità la libreria di gestione
-template preferita, come ad esempio Handlebars oppure Jade, insieme
-alla tecnologia di aggiornamento live della pagina. Basta scrivere il
-template nel modo che siamo soliti fare e Meteor gestirà gli
-aggiornamenti in tempo reale.
-
-Per sfruttare questa possibilità basta creare un file nel progetto con
-estensione `.html`. Nel file mettiamo un tag `<template>` e gli assegnamo
-un attributo di tipo `name`. Mettiamo il contenuto del template
-all'interno del tag. Meteor precompilerà il template, lo fornirà al
-client, rendendolo disponibile come funzione dell'oggetto globale
-`Template`.
+Meteor ships with a templating language called
+[Spacebars](https://github.com/meteor/meteor/blob/devel/packages/spacebars/README.md),
+inspired by [Handlebars](http://handlebarsjs.com/).  It shares some of the
+spirit and syntax of Handlebars, but it has been tailored to produce reactive
+Meteor templates when compiled.
 
 {{#note}}
-Ad oggi l'unica libreria di gestione template pacchettizzata per l'uso
-con Meteor è Handlebars. Fateci sapere quale altra libreria di gestione
-template vorreste usare con Meteor. Intanto potete consultare la
-[documentazione di Handlebars](http://www.handlebarsjs.com/) e le
-[estensioni di Handlebars per Meteor](https://github.com/meteor/meteor/wiki/Handlebars).
+  Today, the only templating system that ships with Meteor is Spacebars, though
+  our community has created packages for other languages such as
+  [Jade](https://atmospherejs.com/package/jade).
 {{/note}}
 
-Un template con `name` uguale ad `hello` viene disegnato invocando la
-funzione `Template.hello`, passando i dati per il template:
+To define templates, create a file in your project with the `.html`
+extension. In the file, make a `<template>` tag and give it a
+`name` attribute. Put the template contents inside the tag. Meteor
+will precompile the template, ship it down to the client, and make it
+available as on the global `Template` object.
+
+When you app is loaded, it automatically renders the special template called
+`<body>`, which is written using the `<body>` element instead of a
+`<template>`. You insert a template inside another template by using the
+`{{dstache}}> inclusion}}` operator.
+
+The easiest way to get data into templates is by defining helper
+functions in JavaScript. Just add the helper functions directly on the
+`Template.`*templateName* object. Putting it all together:
+
 
     <!-- in myapp.html -->
-    <template name="hello">
-      <div class="greeting">Hello there, {{dstache}}first}} {{dstache}}last}}!</div>
-    </{{! }}template>
+    <body>
+      <h1>Today's weather!</h1>
+      {{dstache}}> forecast}}
+    </body>
+
+    <template name="forecast">
+      <div>It'll be {{dstache}}prediction}} tonight</div>
+    {{lt}}/template>
+
+    // in client/myapp.js: reactive helper function
+    Template.forecast.prediction = function () {
+      return Session.get("weather");
+    };
 
     // in the JavaScript console
-    > Template.hello({first: "Alyssa", last: "Hacker"});
-     => "<div class="greeting">Hello there, Alyssa Hacker!</div>"
+    > Session.set("weather", "cloudy");
+    > document.body.innerHTML
+     => "<h1>Today's weather!</h1> <div>It'll be cloudy tonight</div>"
 
-Che ritorna una stringa. Per usare il template insieme al sistema di
-[`Live HTML`](#livehtml), ed avere elementi del DOM che si aggiornano
-automaticamente sul posto, bisogna usare [`Meteor.render`](#meteor_render):
+    > Session.set("weather", "cool and dry");
+    > document.body.innerHTML
+     => "<h1>Today's weather!</h1> <div>It'll be cool and dry tonight</div>"
 
-    Meteor.render(function () {
-      return Template.hello({first: "Alyssa", last: "Hacker"});
-    })
-      => automatically updating DOM elements
 
-Il modo più semplice per mettere dei dati nei template è attraverso la
-definizione di funzioni helper in Javascript. Basta aggiungere le
-funzioni helper direttamente all'oggetto `Template.[template name]`.
-Ad esempio in questo template:
+To iterate over an array or database cursor, use `{{dstache}}#each}}`:
 
+    <!-- in myapp.html -->
     <template name="players">
       {{dstache}}#each topScorers}}
         <div>{{dstache}}name}}</div>
       {{dstache}}/each}}
-    </{{! }}template>
+    {{lt}}/template>
 
-invece di passare `topScorers` come parametro quando chiamiamo la
-funzione del template, potremmo definire una funzione in
-`Template.players`:
-
+    // in myapp.js
     Template.players.topScorers = function () {
       return Users.find({score: {$gt: 100}}, {sort: {score: -1}});
     };
@@ -585,17 +532,9 @@ definiscono dei blocchi cambiano il contesto dati in uso (in particolare
           <div>Senior: {{dstache}}name}}</div>
         {{dstache}}/if}}
       {{dstache}}/each}}
-    </{{! }}template>
+    {{lt}}/template>
 
-{{#note}}
-Nota su Handlebars: `{{dstache}}#if leagueIs "junior"}}` qui può essere
-usato grazie ad una estensione per Meteor che permette l'annidamento di
-un helper dentro un altro helper che definisce un blocco. (Sia `if` che
-`leagueIs` sono helper, tecnicamente, e Handlebars normalmente non
-invocherebbe `leagueIs` in questo caso.)
-{{/note}}
-
-Gli helper possono essere usati anche per passare costanti.
+Helpers can also be used to pass in constant data.
 
     // Works fine with {{dstache}}#each sections}}
     Template.report.sections = ["Situation", "Complication", "Resolution"];
@@ -611,13 +550,13 @@ l'evento.
       {{dstache}}#each player}}
         {{dstache}}> playerScore}}
       {{dstache}}/each}}
-    </{{! }}template>
+    {{lt}}/template>
 
     <template name="playerScore">
       <div>{{dstache}}name}}: {{dstache}}score}}
         <span class="givePoints">Give points</span>
       </div>
-    </{{! }}template>
+    {{lt}}/template>
 
     <!-- myapp.js -->
     Template.playerScore.events({
@@ -626,35 +565,14 @@ l'evento.
       }
     });
 
-Mettendo insieme quanto abbiamo detto, ecco un esempio di come si
-possono inserire dati nel template a nostro piacimento, ed ottenere
-un aggiornamento automatico ogni volta che i dati cambiano. Si veda
-[Live HTML](#livehtml) per ulteriori approfondimenti.
+For more details about Spacebars, read [the Spacebars
+README](https://github.com/meteor/meteor/blob/devel/packages/spacebars/README.md).
 
-    <!-- in myapp.html -->
-    <template name="forecast">
-      <div>It'll be {{dstache}}prediction}} tonight</div>
-    </{{! }}template>
-
-    <!-- in myapp.js -->
-    // JavaScript: reactive helper function
-    Template.forecast.prediction = function () {
-      return Session.get("weather");
-    };
-
-    <!-- in the console -->
-    > Session.set("weather", "cloudy");
-    > document.body.appendChild(Meteor.render(Template.forecast));
-    In DOM:  <div>It'll be cloudy tonight</div>
-
-    > Session.set("weather", "cool and dry");
-    In DOM:  <div>It'll be cool and dry tonight</div>
-
-{{/better_markdown}}
+{{/markdown}}
 </template>
 
 <template name="packages_concept">
-{{#better_markdown}}
+{{#markdown}}
 
   <h2 id="utilizzodeipackage">Utilizzo dei package</h2>
 
@@ -692,12 +610,12 @@ sufficientemente coraggiosi da non temere che il formato dei package
 cambierà in maniera significativa prima di Meteor 1.0 e che non è ancora ufficialmente documentato. Si veda
 [Scrittura di packages](#scritturadipackages).
 
-{{/better_markdown}}
+{{/markdown}}
 </template>
 
 
 <template name="namespacing">
-{{#better_markdown}}
+{{#markdown}}
 
   <h2 id="namespacing">Namespacing</h2>
 
@@ -794,12 +712,12 @@ e in futuro Meteor potrebbe controllare che non lo si faccia e nel caso
 generare un errore. 
 {{/note}}
 
-{{/better_markdown}}
+{{/markdown}}
 </template>
 
 
 <template name="deploying">
-{{#better_markdown}}
+{{#markdown}}
 
 <h2 id="deploying">Deploying</h2>
 
@@ -868,12 +786,12 @@ i package nativi inclusi nel bundle. Per farlo dobbiamo disporre di `npm` ed ese
     $ npm install fibers@1.0.1
 {{/warning}}
 
-{{/better_markdown}}
+{{/markdown}}
 </template>
 
 
 <template name="packages_writing">
-{{#better_markdown}}
+{{#markdown}}
 
   <h2 id="scritturadipackage">Scrittura di package</h2>
 
@@ -982,5 +900,5 @@ alcuni rapidi suggerimenti:
   ha estensioni native il package creato da Meteor sarà portabile su altre
   architetture.
 
-{{/better_markdown}}
+{{/markdown}}
 </template>
