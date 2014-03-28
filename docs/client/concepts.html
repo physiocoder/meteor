@@ -137,7 +137,7 @@ al momento del caricamenteo iniziale dell'applicazione.
 Le sezioni template invece sono convertite in funzioni JavaScript
 disponibili nel namespace `Template`. E' un modo molto efficiente di
 fornire i template HTML al client.
-Si può consultare la sezione [templates](#templates) per ulteriori
+Si può consultare la sezione [templates](#templatehtmllive) per ulteriori
 dettagli.
 
 Infine il server Meteor rende disponibili i file nella cartella `public`
@@ -513,7 +513,7 @@ Per leggere i dati di un array o di un cursore di database si usa
       return Users.find({score: {$gt: 100}}, {sort: {score: -1}});
     };
 
-In questo caso i dati provengono da una quary al database. Quando il
+In questo caso i dati provengono da una query al database. Quando il
 cursore del database viene passato ad `{{dstache}}#each}}`, vengono eseguite
 tutte le operazioni per aggiungere e spostare i nodi del DOM man mano che i
 risultati popolano la query.
