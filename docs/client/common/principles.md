@@ -1,25 +1,27 @@
 {{#template name="principles"}}
 
-<h2 id="sevenprinciples">Principles of Meteor</h2>
+<h2 id="isetteprincipi">I Principi di Meteor</h2>
 
-- _Data on the Wire_. Meteor doesn't send HTML over the network. The server sends data and
-lets the client render it.
+- _Trasferisci solo Dati_. Meteor non invia HTML attraverso la rete, il server invia i dati
+e lascia che il client decida come rappresentarli.
 
-- _One Language._ Meteor lets you write both the client and the server parts of your
-application in JavaScript.
+- _Un Solo Linguaggio_. Con Meteor scrivi in JavaScript sia il codice lato
+client che il codice server.
 
-- _Database Everywhere_. You can use the same methods to access your
-database from the client or the server.
+- _Il Database è Ovunque_. Utilizza la stessa API per accedere al
+database lato client o server.
 
-- _Latency Compensation_. On the client, Meteor prefetches data and simulates models to make it look like server method calls return instantly.
+- _Latenza compensata_. Meteor precarica sul client una parte dei dati e simula la
+disponibilità dell'intero database: l'utente percepisce la connessione al database come istantanea.
 
-- _Full Stack Reactivity_. In Meteor, realtime is the default. All layers, from
-database to template, update themselves automatically when necessary.
+- _Reattività di Tutto lo Stack_. In Meteor i dati sono sempre aggiornati in
+tempo reale. Tutti i livelli, dal database all'interfaccia, si aggiornano automaticamente quando necessario.
 
-- _Embrace the Ecosystem_. Meteor is open source and integrates with existing open source tools and frameworks.
+- _Sposa l’Ecosistema_. Meteor è open source e si integra agli
+strumenti open source e framework esistenti.
 
-- _Simplicity Equals Productivity_. The best way to make something
-seem simple is to have it actually _be_ simple. Meteor's main functionality has
-clean, classically beautiful APIs.
+- _Semplicità = Produttività_. Il modo migliore per fare sembrare
+qualcosa semplice è che _sia_ semplice. Meteor si usa tramite API
+pulite ed eleganti.
 
 {{/template}}

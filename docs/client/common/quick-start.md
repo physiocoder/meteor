@@ -1,22 +1,22 @@
 {{#template name="quickStart"}}
 ## Quick start!
 
-The following works on all [supported
-platforms](https://github.com/meteor/meteor/wiki/Supported-Platforms).
+Le istruzioni che seguono sono adatte a tutte le [piattaforme
+supportate](https://github.com/meteor/meteor/wiki/Supported-Platforms).
 
-Install Meteor:
+Installare Meteor:
 
 ```bash
 $ curl https://install.meteor.com | /bin/sh
 ```
 
-Create a project:
+Creare un progetto:
 
 ```bash
 $ meteor create myapp
 ```
 
-Run it locally:
+Eseguirlo localmente:
 
 ```bash
 $ cd myapp
@@ -24,7 +24,7 @@ $ meteor
 # Meteor server running on: http://localhost:3000/
 ```
 
-Unleash it on the world (on a free server we provide):
+Mostrarlo al mondo (su un server gratuito fornito da noi):
 
 ```bash
 $ meteor deploy myapp.meteor.com
