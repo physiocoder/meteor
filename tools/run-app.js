@@ -478,16 +478,7 @@ _.extend(AppRunner.prototype, {
     // you are testing packages from an app and you 'meteor update'
     // that app.
     if (self.appDirForVersionCheck) {
-      var wrongRelease;
-      var rightReleaseMessages = buildmessage.capture(function () {
-        wrongRelease = ! release.usingRightReleaseForApp();
-      });
-      if (rightReleaseMessages.hasMessages()) {
-        return {
-          outcome: 'bundle-fail',
-          bundleResult: { errors: rightReleaseMessages }
-        };
-      }
+      var wrongRelease = ! release.usingRightReleaseForApp();
       if (wrongRelease) {
         return { outcome: 'wrong-release',
                  releaseNeeded: project.getNormalizedMeteorReleaseVersion()
@@ -498,14 +489,7 @@ _.extend(AppRunner.prototype, {
     // Bundle up the app
     var bundlePath = path.join(self.appDir, '.meteor', 'local', 'build');
     if (self.recordPackageUsage) {
-      var statsMessages = buildmessage.capture(function () {
-        stats.recordPackages("sdk.run");
-      });
-      if (statsMessages.hasMessages()) {
-        process.stdout.write("Error recording package list:\n" +
-                             statsMessages.formatMessages());
-        // ... but continue;
-      }
+      stats.recordPackages("sdk.run");
     }
 
     // Cache the server target because the server will not change inside

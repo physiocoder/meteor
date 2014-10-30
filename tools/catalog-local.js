@@ -156,7 +156,6 @@ _.extend(LocalCatalog.prototype, {
   getVersion: function (name, version) {
     var self = this;
     self._requireInitialized();
-    buildmessage.assertInCapture();
 
     var lookupVersion = function () {
       return _.has(self.versions, name) &&
@@ -190,13 +189,6 @@ _.extend(LocalCatalog.prototype, {
     var versions = self.getSortedVersions(name);
     versions.reverse();
     return self.getVersion(name, versions[0]);
-  },
-
-  // Overridden by CompleteCatalog.
-  // XXX this is kinda sketchy, maybe callers should only call this
-  //     on the CompleteCatalog?
-  isLocalPackage: function () {
-    return false;
   },
 
   // If this package has any builds at this version, return an array of builds
