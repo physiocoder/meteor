@@ -33,7 +33,12 @@ if (Meteor.isClient) (function () {
     }, 10 * 1000, 100);
   };
   var invalidateLoginsStep = function (test, expect) {
-    Meteor.call("testInvalidateLogins", true, expect(function (error) {
+    Meteor.call("testInvalidateLogins", 'fail', expect(function (error) {
+      test.isFalse(error);
+    }));
+  };
+  var hideActualLoginErrorStep = function (test, expect) {
+    Meteor.call("testInvalidateLogins", 'hide', expect(function (error) {
       test.isFalse(error);
     }));
   };
@@ -69,7 +74,7 @@ if (Meteor.isClient) (function () {
       // Set up a reactive context that only refreshes when Meteor.user() is
       // invalidated.
       var loaded = false;
-      var handle = Deps.autorun(function () {
+      var handle = Tracker.autorun(function () {
         if (Meteor.user() && Meteor.user().emails)
           loaded = true;
       });
@@ -81,7 +86,7 @@ if (Meteor.isClient) (function () {
         // By the time of the login callback, the user should be loaded.
         test.isTrue(Meteor.user().emails);
         // Flushing should get us the rerun as well.
-        Deps.flush();
+        Tracker.flush();
         test.isTrue(loaded);
         handle.stop();
       }));
@@ -468,13 +473,59 @@ if (Meteor.isClient) (function () {
         test.equal(Meteor.userId(), null);
       }));
     },
+    logoutStep,
+    function (test, expect) {
+      var self = this;
+      // Test that Meteor.logoutOtherClients logs out a second
+      // authentcated connection while leaving Accounts.connection
+      // logged in.
+      var secondConn = DDP.connect(Meteor.absoluteUrl());
+      var token;
+
+      var expectSecondConnLoggedOut = expect(function (err, result) {
+        test.isTrue(err);
+      });
+
+      var expectAccountsConnLoggedIn = expect(function (err, result) {
+        test.isFalse(err);
+      });
+
+      var expectSecondConnLoggedIn = expect(function (err, result) {
+        test.equal(result.token, token);
+        test.isFalse(err);
+        Meteor.logoutOtherClients(function (err) {
+          test.isFalse(err);
+          secondConn.call('login', { resume: token },
+                          expectSecondConnLoggedOut);
+          Accounts.connection.call('login', {
+            resume: Accounts._storedLoginToken()
+          }, expectAccountsConnLoggedIn);
+        });
+      });
+
+      Meteor.loginWithPassword(
+        self.username,
+        self.password,
+        expect(function (err) {
+          test.isFalse(err);
+          token = Accounts._storedLoginToken();
+          test.isTrue(token);
+          secondConn.call('login', { resume: token },
+                          expectSecondConnLoggedIn);
+        })
+      );
+    },
+    logoutStep,
+
+    // The tests below this point are for the deprecated
+    // `logoutOtherClients` method.
+
     function (test, expect) {
       var self = this;
 
       // Test that Meteor.logoutOtherClients logs out a second authenticated
       // connection while leaving Accounts.connection logged in.
       var token;
-      var userId;
       self.secondConn = DDP.connect(Meteor.absoluteUrl());
 
       var expectLoginError = expect(function (err) {
@@ -502,7 +553,6 @@ if (Meteor.isClient) (function () {
         token = Accounts._storedLoginToken();
         self.beforeLogoutOthersToken = token;
         test.isTrue(token);
-        userId = Meteor.userId();
         self.secondConn.call("login", { resume: token },
                              expectSecondConnLoggedIn);
       }));
@@ -536,41 +586,9 @@ if (Meteor.isClient) (function () {
       );
     },
     logoutStep,
-    function (test, expect) {
-      var self = this;
-      // Test that, when we call logoutOtherClients, if the server disconnects
-      // us before the logoutOtherClients callback runs, then we still end up
-      // logged in.
-      var expectServerLoggedIn = expect(function (err, result) {
-        test.isFalse(err);
-        test.isTrue(Meteor.userId());
-        test.equal(result, Meteor.userId());
-      });
 
-      Meteor.loginWithPassword(
-        self.username,
-        self.password,
-        expect(function (err) {
-          test.isFalse(err);
-          test.isTrue(Meteor.userId());
 
-          // The test is only useful if things interleave in the following order:
-          // - logoutOtherClients runs on the server
-          // - onReconnect fires and sends a login method with the old token,
-          //   which results in an error
-          // - logoutOtherClients callback runs and stores the new token and
-          //   logs in with it
-          // In practice they seem to interleave this way, but I'm not sure how
-          // to make sure that they do.
 
-          Meteor.logoutOtherClients(function (err) {
-            test.isFalse(err);
-            Meteor.call("getUserId", expectServerLoggedIn);
-          });
-        })
-      );
-    },
-    logoutStep,
     function (test, expect) {
       var self = this;
       // Test that deleting a user logs out that user's connections.
@@ -600,6 +618,28 @@ if (Meteor.isClient) (function () {
         expect(function (error) {
           test.isTrue(error);
           test.equal(error.reason, "Login forbidden");
+        })
+      );
+    },
+    validateLoginsStep,
+    function (test, expect) {
+      Meteor.loginWithPassword(
+        "no such user",
+        "some password",
+        expect(function (error) {
+          test.isTrue(error);
+          test.equal(error.reason, 'User not found');
+        })
+      );
+    },
+    hideActualLoginErrorStep,
+    function (test, expect) {
+      Meteor.loginWithPassword(
+        "no such user",
+        "some password",
+        expect(function (error) {
+          test.isTrue(error);
+          test.equal(error.reason, 'hide actual error');
         })
       );
     },
@@ -692,6 +732,86 @@ if (Meteor.isClient) (function () {
     }
   ]);
 
+  testAsyncMulti("passwords - srp to bcrypt upgrade", [
+    logoutStep,
+    // Create user with old SRP credentials in the database.
+    function (test, expect) {
+      var self = this;
+      Meteor.call("testCreateSRPUser", expect(function (error, result) {
+        test.isFalse(error);
+        self.username = result;
+      }));
+    },
+    // We are able to login with the old style credentials in the database.
+    function (test, expect) {
+      Meteor.loginWithPassword(this.username, 'abcdef', expect(function (error) {
+        test.isFalse(error);
+      }));
+    },
+    function (test, expect) {
+      Meteor.call("testSRPUpgrade", this.username, expect(function (error) {
+        test.isFalse(error);
+      }));
+    },
+    logoutStep,
+    // After the upgrade to bcrypt we're still able to login.
+    function (test, expect) {
+      Meteor.loginWithPassword(this.username, 'abcdef', expect(function (error) {
+        test.isFalse(error);
+      }));
+    },
+    logoutStep,
+    function (test, expect) {
+      Meteor.call("removeUser", this.username, expect(function (error) {
+        test.isFalse(error);
+      }));
+    }
+  ]);
+
+  testAsyncMulti("passwords - srp to bcrypt upgrade via password change", [
+    logoutStep,
+    // Create user with old SRP credentials in the database.
+    function (test, expect) {
+      var self = this;
+      Meteor.call("testCreateSRPUser", expect(function (error, result) {
+        test.isFalse(error);
+        self.username = result;
+      }));
+    },
+    // Log in with the plaintext password handler, which should NOT upgrade us to bcrypt.
+    function (test, expect) {
+      Accounts.callLoginMethod({
+        methodName: "login",
+        methodArguments: [ { user: { username: this.username }, password: "abcdef" } ],
+        userCallback: expect(function (err) {
+          test.isFalse(err);
+        })
+      });
+    },
+    function (test, expect) {
+      Meteor.call("testNoSRPUpgrade", this.username, expect(function (error) {
+        test.isFalse(error);
+      }));
+    },
+    // Changing our password should upgrade us to bcrypt.
+    function (test, expect) {
+      Accounts.changePassword("abcdef", "abcdefg", expect(function (error) {
+        test.isFalse(error);
+      }));
+    },
+    function (test, expect) {
+      Meteor.call("testSRPUpgrade", this.username, expect(function (error) {
+        test.isFalse(error);
+      }));
+    },
+    // And after the upgrade we should be able to change our password again.
+    function (test, expect) {
+      Accounts.changePassword("abcdefg", "abcdef", expect(function (error) {
+        test.isFalse(error);
+      }));
+    },
+    logoutStep
+  ]);
 }) ();
 
 
@@ -738,16 +858,15 @@ if (Meteor.isServer) (function () {
       // set a new password.
       Accounts.setPassword(userId, 'new password');
       user = Meteor.users.findOne(userId);
-      var oldVerifier = user.services.password.srp;
-      test.isTrue(user.services.password.srp);
+      var oldSaltedHash = user.services.password.bcrypt;
+      test.isTrue(oldSaltedHash);
 
-      // reset with the same password, see we get a different verifier
+      // reset with the same password, see we get a different salted hash
       Accounts.setPassword(userId, 'new password');
       user = Meteor.users.findOne(userId);
-      var newVerifier = user.services.password.srp;
-      test.notEqual(oldVerifier.salt, newVerifier.salt);
-      test.notEqual(oldVerifier.identity, newVerifier.identity);
-      test.notEqual(oldVerifier.verifier, newVerifier.verifier);
+      var newSaltedHash = user.services.password.bcrypt;
+      test.isTrue(newSaltedHash);
+      test.notEqual(oldSaltedHash, newSaltedHash);
 
       // cleanup
       Meteor.users.remove(userId);

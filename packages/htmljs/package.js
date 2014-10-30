@@ -1,11 +1,15 @@
 Package.describe({
-  summary: "Small library for expressing HTML trees"
+  summary: "Small library for expressing HTML trees",
+  version: '1.0.2'
 });
 
 Package.on_use(function (api) {
+  api.use('deps');
   api.export('HTML');
 
-  api.add_files(['utils.js', 'html.js', 'tohtml.js']);
+  api.add_files(['preamble.js',
+                 'visitors.js',
+                 'html.js']);
 });
 
 Package.on_test(function (api) {

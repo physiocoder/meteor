@@ -1,75 +1,93 @@
-// A place to store request tokens pending verification
-var requestTokens = {};
-
-OAuth1Test = {requestTokens: requestTokens};
+var url = Npm.require("url");
 
 // connect middleware
-Oauth._requestHandlers['1'] = function (service, query, res) {
-
+OAuth._requestHandlers['1'] = function (service, query, res) {
   var config = ServiceConfiguration.configurations.findOne({service: service.serviceName});
-  if (!config) {
-    throw new ServiceConfiguration.ConfigError("Service " + service.serviceName + " not configured");
+  if (! config) {
+    throw new ServiceConfiguration.ConfigError(service.serviceName);
   }
 
   var urls = service.urls;
   var oauthBinding = new OAuth1Binding(config, urls);
 
+  var credentialSecret;
+
   if (query.requestTokenAndRedirect) {
     // step 1 - get and store a request token
+    var callbackUrl = OAuth._redirectUri(service.serviceName, config, {
+      state: query.state,
+      cordova: (query.cordova === "true"),
+      android: (query.android === "true")
+    });
 
     // Get a request token to start auth process
-    oauthBinding.prepareRequestToken(query.requestTokenAndRedirect);
+    oauthBinding.prepareRequestToken(callbackUrl);
 
     // Keep track of request token so we can verify it on the next step
-    requestTokens[query.state] = {
-      requestToken: oauthBinding.requestToken, 
-      requestTokenSecret: oauthBinding.requestTokenSecret
-    };
+    OAuth._storeRequestToken(
+      OAuth._credentialTokenFromQuery(query),
+      oauthBinding.requestToken,
+      oauthBinding.requestTokenSecret);
 
     // support for scope/name parameters
     var redirectUrl = undefined;
     if(typeof urls.authenticate === "function") {
-      redirectUrl = urls.authenticate(oauthBinding);
+      redirectUrl = urls.authenticate(oauthBinding, {
+        query: query
+      });
     } else {
-      redirectUrl = urls.authenticate + '?oauth_token=' + oauthBinding.requestToken;
+      // Parse the URL to support additional query parameters in urls.authenticate
+      var redirectUrlObj = url.parse(urls.authenticate, true);
+      redirectUrlObj.query = redirectUrlObj.query || {};
+      redirectUrlObj.query.oauth_token = oauthBinding.requestToken;
+      redirectUrlObj.search = '';
+      // Reconstruct the URL back with provided query parameters merged with oauth_token
+      redirectUrl = url.format(redirectUrlObj);
     }
 
     // redirect to provider login, which will redirect back to "step 2" below
+
     res.writeHead(302, {'Location': redirectUrl});
     res.end();
   } else {
-    // step 2, redirected from provider login - complete the login
-    // process: if the user authorized permissions, get an access
-    // token and access token secret and log in as user
+    // step 2, redirected from provider login - store the result
+    // and close the window to allow the login handler to proceed
 
     // Get the user's request token so we can verify it and clear it
-    var requestToken = requestTokens[query.state].requestToken;
-    var requestTokenSecret = requestTokens[query.state].requestTokenSecret;
-    delete requestTokens[query.state];
+    var requestTokenInfo = OAuth._retrieveRequestToken(
+      OAuth._credentialTokenFromQuery(query));
+
+    if (! requestTokenInfo) {
+      throw new Error("Unable to retrieve request token");
+    }
 
     // Verify user authorized access and the oauth_token matches
     // the requestToken from previous step
-    if (query.oauth_token && query.oauth_token === requestToken) {
+    if (query.oauth_token && query.oauth_token === requestTokenInfo.requestToken) {
 
       // Prepare the login results before returning.  This way the
       // subsequent call to the `login` method will be immediate.
 
       // Get the access token for signing requests
-      oauthBinding.prepareAccessToken(query, requestTokenSecret);
+      oauthBinding.prepareAccessToken(query, requestTokenInfo.requestTokenSecret);
 
       // Run service-specific handler.
       var oauthResult = service.handleOauthRequest(oauthBinding);
 
-      // Add the login result to the result map
-      Oauth._loginResultForCredentialToken[query.state] = {
+      var credentialToken = OAuth._credentialTokenFromQuery(query);
+      credentialSecret = Random.secret();
+
+      // Store the login result so it can be retrieved in another
+      // browser tab by the result handler
+      OAuth._storePendingCredential(credentialToken, {
         serviceName: service.serviceName,
         serviceData: oauthResult.serviceData,
         options: oauthResult.options
-      };
+      }, credentialSecret);
     }
 
     // Either close the window, redirect, or render nothing
     // if all else fails
-    Oauth._renderOauthResults(res, query);
+    OAuth._renderOauthResults(res, query, credentialSecret);
   }
 };

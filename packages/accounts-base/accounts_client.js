@@ -3,12 +3,17 @@
 ///
 
 // This is reactive.
+
+/**
+ * @summary Get the current user id, or `null` if no user is logged in. A reactive data source.
+ * @locus Anywhere but publish functions
+ */
 Meteor.userId = function () {
   return Accounts.connection.userId();
 };
 
 var loggingIn = false;
-var loggingInDeps = new Deps.Dependency;
+var loggingInDeps = new Tracker.Dependency;
 // This is mostly just called within this file, but Meteor.loginWithPassword
 // also uses it to make loggingIn() be true during the beginPasswordExchange
 // method call too.
@@ -18,12 +23,22 @@ Accounts._setLoggingIn = function (x) {
     loggingInDeps.changed();
   }
 };
+
+/**
+ * @summary True if a login method (such as `Meteor.loginWithPassword`, `Meteor.loginWithFacebook`, or `Accounts.createUser`) is currently in progress. A reactive data source.
+ * @locus Client
+ */
 Meteor.loggingIn = function () {
   loggingInDeps.depend();
   return loggingIn;
 };
 
 // This calls userId, which is reactive.
+
+/**
+ * @summary Get the current user record, or `null` if no user is logged in. A reactive data source.
+ * @locus Anywhere but publish functions
+ */
 Meteor.user = function () {
   var userId = Meteor.userId();
   if (!userId)
@@ -62,7 +77,7 @@ Meteor.user = function () {
 Accounts.callLoginMethod = function (options) {
   options = _.extend({
     methodName: 'login',
-    methodArguments: [],
+    methodArguments: [{}],
     _suppressLoggingIn: false
   }, options);
   // Set defaults for callback arguments to no-op functions; make sure we
@@ -203,6 +218,11 @@ makeClientLoggedIn = function(userId, token, tokenExpires) {
   Accounts.connection.setUserId(userId);
 };
 
+/**
+ * @summary Log the user out.
+ * @locus Client
+ * @param {Function} [callback] Optional callback. Called with no arguments on success, or with a single `Error` argument on failure.
+ */
 Meteor.logout = function (callback) {
   Accounts.connection.apply('logout', [], {wait: true}, function(error, result) {
     if (error) {
@@ -214,39 +234,46 @@ Meteor.logout = function (callback) {
   });
 };
 
+/**
+ * @summary Log out other clients logged in as the current user, but does not log out the client that calls this function.
+ * @locus Client
+ * @param {Function} [callback] Optional callback. Called with no arguments on success, or with a single `Error` argument on failure.
+ */
 Meteor.logoutOtherClients = function (callback) {
-  // Call the `logoutOtherClients` method. Store the login token that we get
-  // back and use it to log in again. The server is not supposed to close
-  // connections on the old token for 10 seconds, so we should have time to
-  // store our new token and log in with it before being disconnected. If we get
-  // disconnected, then we'll immediately reconnect with the new token. If for
-  // some reason we get disconnected before storing the new token, then the
-  // worst that will happen is that we'll have a flicker from trying to log in
-  // with the old token before storing and logging in with the new one.
-  Accounts.connection.apply('logoutOtherClients', [], { wait: true },
-               function (error, result) {
-                 if (error) {
-                   callback && callback(error);
-                 } else {
-                   var userId = Meteor.userId();
-                   storeLoginToken(userId, result.token, result.tokenExpires);
-                   // If the server hasn't disconnected us yet by deleting our
-                   // old token, then logging in now with the new valid token
-                   // will prevent us from getting disconnected. If the server
-                   // has already disconnected us due to our old invalid token,
-                   // then we would have already tried and failed to login with
-                   // the old token on reconnect, and we have to make sure a
-                   // login method gets sent here with the new token.
-                   Meteor.loginWithToken(result.token, function (err) {
-                     if (err &&
-                         storedLoginToken() &&
-                         storedLoginToken().token === result.token) {
-                       makeClientLoggedOut();
-                     }
-                     callback && callback(err);
-                   });
-                 }
-               });
+  // We need to make two method calls: one to replace our current token,
+  // and another to remove all tokens except the current one. We want to
+  // call these two methods one after the other, without any other
+  // methods running between them. For example, we don't want `logout`
+  // to be called in between our two method calls (otherwise the second
+  // method call would return an error). Another example: we don't want
+  // logout to be called before the callback for `getNewToken`;
+  // otherwise we would momentarily log the user out and then write a
+  // new token to localStorage.
+  //
+  // To accomplish this, we make both calls as wait methods, and queue
+  // them one after the other, without spinning off the event loop in
+  // between. Even though we queue `removeOtherTokens` before
+  // `getNewToken`, we won't actually send the `removeOtherTokens` call
+  // until the `getNewToken` callback has finished running, because they
+  // are both wait methods.
+  Accounts.connection.apply(
+    'getNewToken',
+    [],
+    { wait: true },
+    function (err, result) {
+      if (! err) {
+        storeLoginToken(Meteor.userId(), result.token, result.tokenExpires);
+      }
+    }
+  );
+  Accounts.connection.apply(
+    'removeOtherTokens',
+    [],
+    { wait: true },
+    function (err) {
+      callback && callback(err);
+    }
+  );
 };
 
 
@@ -265,17 +292,70 @@ Accounts.loginServicesConfigured = function () {
   return loginServicesHandle.ready();
 };
 
+// Some login services such as the redirect login flow or the resume
+// login handler can log the user in at page load time.  The
+// Meteor.loginWithX functions have a callback argument, but the
+// callback function instance won't be in memory any longer if the
+// page was reloaded.  The `onPageLoadLogin` function allows a
+// callback to be registered for the case where the login was
+// initiated in a previous VM, and we now have the result of the login
+// attempt in a new VM.
+
+var pageLoadLoginCallbacks = [];
+var pageLoadLoginAttemptInfo = null;
+
+// Register a callback to be called if we have information about a
+// login attempt at page load time.  Call the callback immediately if
+// we already have the page load login attempt info, otherwise stash
+// the callback to be called if and when we do get the attempt info.
+//
+Accounts.onPageLoadLogin = function (f) {
+  if (pageLoadLoginAttemptInfo)
+    f(pageLoadLoginAttemptInfo);
+  else
+    pageLoadLoginCallbacks.push(f);
+};
+
+
+// Receive the information about the login attempt at page load time.
+// Call registered callbacks, and also record the info in case
+// someone's callback hasn't been registered yet.
+//
+Accounts._pageLoadLogin = function (attemptInfo) {
+  if (pageLoadLoginAttemptInfo) {
+    Meteor._debug("Ignoring unexpected duplicate page load login attempt info");
+    return;
+  }
+  _.each(pageLoadLoginCallbacks, function (callback) { callback(attemptInfo); });
+  pageLoadLoginCallbacks = [];
+  pageLoadLoginAttemptInfo = attemptInfo;
+};
+
+
 ///
 /// HANDLEBARS HELPERS
 ///
 
-// If our app has a UI, register the {{currentUser}} and {{loggingIn}}
+// If our app has a Blaze, register the {{currentUser}} and {{loggingIn}}
 // global helpers.
-if (Package.ui) {
-  Package.ui.UI.registerHelper('currentUser', function () {
+if (Package.blaze) {
+  /**
+   * @global
+   * @name  currentUser
+   * @isHelper true
+   * @summary Calls [Meteor.user()](#meteor_user). Use `{{#if currentUser}}` to check whether the user is logged in.
+   */
+  Package.blaze.Blaze.Template.registerHelper('currentUser', function () {
     return Meteor.user();
   });
-  Package.ui.UI.registerHelper('loggingIn', function () {
+
+  /**
+   * @global
+   * @name  loggingIn
+   * @isHelper true
+   * @summary Calls [Meteor.loggingIn()](#meteor_loggingin).
+   */
+  Package.blaze.Blaze.Template.registerHelper('loggingIn', function () {
     return Meteor.loggingIn();
   });
 }

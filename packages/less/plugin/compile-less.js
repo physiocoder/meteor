@@ -3,18 +3,10 @@ var path = Npm.require('path');
 var less = Npm.require('less');
 var Future = Npm.require('fibers/future');
 
-Plugin.registerSourceHandler("less", function (compileStep) {
-  // XXX annoying that this is replicated in .css, .less, and .styl
-  if (! compileStep.archMatches('browser')) {
-    // XXX in the future, might be better to emit some kind of a
-    // warning if a stylesheet is included on the server, rather than
-    // silently ignoring it. but that would mean you can't stick .css
-    // at the top level of your app, which is kind of silly.
-    return;
-  }
-
+Plugin.registerSourceHandler("less", {archMatching: 'web'}, function (compileStep) {
   var source = compileStep.read().toString('utf8');
   var options = {
+    filename: compileStep.inputPath,
     // Use fs.readFileSync to process @imports. This is the bundler, so
     // that's not going to cause concurrency issues, and it means that (a)
     // we don't have to use Futures and (b) errors thrown by bugs in less
@@ -43,7 +35,7 @@ Plugin.registerSourceHandler("less", function (compileStep) {
     compileStep.error({
       message: "Less compiler error: " + e.message,
       sourcePath: e.filename || compileStep.inputPath,
-      line: e.line - 1,  // dunno why, but it matches
+      line: e.line,
       column: e.column + 1
     });
     return;

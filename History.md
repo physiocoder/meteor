@@ -1,9 +1,976 @@
 ## v.NEXT
 
+
+## v1.0
+
+* Add the `meteor admin get-machine` command to make it easier to
+  publish packages with binary dependencies for all
+  architectures. `meteor publish` no longer publishes builds
+  automatically.
+
+* Reduce unnecessary syncs with the package server, which speeds up
+  startup times for many commands.
+
+* Speed up `meteor deploy` by not bundling unnecessary files and
+  programs.
+
+* Implement reasonable default behavior for launch screens on mobile
+  apps.
+
+* Don't build for Android when only the iOS build is required, and
+  vice versa.
+
+* Fix `meteor publish-for-arch` springboarding. XXX more detail?
+
+* Restyle the 'leaderboard' example, and optimize it for both desktop
+  and mobile.
+
+* Fix bug that could cause mobile apps to stop being able to receive hot
+  code push updates.
+
+* Fix default `api.versionsFrom` field in packages created with `meteor
+  create --package`.
+
+* Work around the `meteor run` proxy occasionally running out of sockets.
+
+* To make Meteor easier to use on slow or unreliable network
+  connections, increase timeouts for DDP connections that the Meteor
+  tool uses to communicate with the package server. #2777, #2789.
+
+* Fix bug with regular expressions in minimongo. #2817
+
+* Add READMEs for several core packages.
+
+* Include protocols in URLs printed by `meteor deploy`.
+
+* Improve error message for limited ordered observe. #1643
+
+
+## v0.9.4
+
+### New Features
+
+* The new `meteor debug` command and `--debug-port` command line option
+  to `meteor run` allow you to easily use node-inspector to debug your
+  server-side code. Add a `debugger` statement to your code to create a
+  breakpoint.
+
+* Add new a `meteor run --test` command that runs
+  [Velocity](https://github.com/meteor-velocity/velocity) tests in your
+  app .
+
+* Add new callbacks `Accounts.onResetPasswordLink`,
+  `Accounts.onEnrollmentLink`, and `Accounts.onEmailVerificationLink`
+  that make it easier to build custom user interfaces on top of the
+  accounts system. These callbacks should be registered before
+  `Meteor.startup` fires, and will be called if the URL matches a link
+  in an email sent by `Accounts.resetPassword`, etc. See
+  https://docs.meteor.com/#Accounts-onResetPasswordLink.
+
+* A new configuration file for mobile apps,
+  `<APP>/mobile-config.js`. This allows you to set app metadata, icons,
+  splash screens, preferences, and PhoneGap/Cordova plugin settings
+  without needing a `cordova_build_override` directory. See
+  https://docs.meteor.com/#mobileconfigjs.
+
+
+### API Changes
+
+* Rename `{{> UI.dynamic}}` to `{{> Template.dynamic}}`, and likewise
+  with `UI.contentBlock` and `UI.elseBlock`. The UI namespace is no
+  longer used anywhere except for backwards compatibility.
+
+* Deprecate the `Template.someTemplate.myHelper = ...` syntax in favor
+  of `Template.someTemplate.helpers(...)`.  Using the older syntax still
+  works, but prints a deprecation warning to the console.
+
+* `Package.registerBuildPlugin` its associated functions have been added
+  to the public API, cleaned up, and documented. The new function is
+  identical to the earlier _transitional_registerBuildPlugin except for
+  minor backwards- compatible API changes. See
+  https://docs.meteor.com/#Package-registerBuildPlugin
+
+* Rename the `showdown` package to `markdown`.
+
+* Deprecate the `amplify`, `backbone`, `bootstrap`, and `d3` integration
+  packages in favor of community alternatives.  These packages will no
+  longer be maintained by MDG.
+
+
+### Tool Changes
+
+* Improved output from `meteor build` to make it easier to publish
+  mobile apps to the App Store and Play Store. See the wiki pages for
+  instructions on how to publish your
+  [iOS](https://github.com/meteor/meteor/wiki/How-to-submit-your-iOS-app-to-App-Store)
+  and
+  [Android](https://github.com/meteor/meteor/wiki/How-to-submit-your-Android-app-to-Play-Store)
+  apps.
+
+* Packages can now be marked as debug-mode only by adding `debugOnly:
+  true` to `Package.describe`. Debug-only packages are not included in
+  the app when it is bundled for production (`meteor build` or `meteor
+  run --production`). This allows package authors to build packages
+  specifically for testing and debugging without increasing the size of
+  the resulting app bundle or causing apps to ship with debug
+  functionality built in.
+
+* Rework the process for installing mobile development SDKs. There is
+  now a `meteor install-sdk` command that automatically install what
+  software it can and points to documentation for the parts that
+  require manual installation.
+
+* The `.meteor/cordova-platforms` file has been renamed to
+  `.meteor/platforms` and now includes the default `server` and
+  `browser` platforms. The default platforms can't currently be removed
+  from a project, though this will be possible in the future. The old
+  file will be automatically migrated to the new one when the app is run
+  with Meteor 0.9.4 or above.
+
+* The `unipackage.json` file inside downloaded packages has been renamed
+  to `isopack.json` and has an improved forwards-compatible format. To
+  maintain backwards compatibility with previous releases, packages will
+  be built with both files.
+
+* The local package metadata cache now uses SQLite, which is much faster
+  than the previous implementation. This improves `meteor` command line
+  tool startup time.
+
+* The constraint solver used by the client to find compatible versions
+  of packages is now much faster.
+
+* The `--port` option to `meteor run` now requires a numeric port
+  (e.g. `meteor run --port example.com` is no longer valid).
+
+* The `--mobile-port` option `meteor run` has been reworked. The option
+  is now `--mobile-server` in `meteor run` and `--server` in `meteor
+  build`. `--server` is required for `meteor build` in apps with mobile
+  platforms installed. `--mobile-server` defaults to an automatically
+  detected IP address on port 3000, and `--server` requires a hostname
+  but defaults to port 80 if a port is not specified.
+
+* Operations that take longer than a few seconds (e.g. downloading
+  packages, installing the Android SDK, etc) now show a progress bar.
+
+
+### Bug Fixes
+
+* Fix behavior of ROOT_URL with path ending in `/`.
+
+* Fix source maps when using a ROOT_URL with a path. #2627
+
+* Change the mechanism that the Meteor tool uses to clean up app server
+  processes. The new mechanism is more resilient to slow app bundles and
+  other CPU-intensive tasks. #2536, #2588.
+
+
+Patches by Github users cryptoquick, Gaelan, jperl, meonkeys, mitar,
+mquandalle, prapicault, pscanf, richguan, rick-golden-healthagen,
+rissem, rosh93, rzymek, and timoabend
+
+
+## v0.9.3.1
+
+* Don't crash when failing to contact the package server. #2713
+
+* Allow more than one dash in package versions. #2715
+
+
+## v0.9.3
+
+### More Package Version Number Flexibility
+
+* Packages now support relying on multiple major versions of their
+  dependencies (eg `blaze@1.0.0 || 2.0.0`). Additionally, you can now
+  call `api.versionsFrom(<release>)` multiple times, or with an array
+  (eg `api.versionsFrom([<release1>, <release2>])`. Meteor will
+  interpret this to mean that the package will work with packages from
+  all the listed releases.
+
+* Support for "wrapped package" version numbers. There is now a `_` field
+  in version numbers. The `_` field must be an integer, and versions with
+  the `_` are sorted after versions without. This allows using the
+  upstream version number as the Meteor package version number and being
+  able to publish multiple version of the Meteor package (e.g.
+  `jquery@1.11.1_2`).
+
+Note: packages using the `||` operator or the `_` symbol in their
+versions or dependencies will be invisible to pre-0.9.3 users. Meteor
+versions 0.9.2 and before do not understand the new version formats and
+will not be able to use versions of packages that use the new features.
+
+
+### Other Command-line Tool Improvements
+
+* More detailed constraint solver output. Meteor now tells you which
+  constraints prevent upgrading or adding new packages. This will make
+  it much easier to update your app to new versions.
+
+* Better handling of pre-release versions (e.g. versions with
+  `-`). Pre-release packages will now be included in an app if and only
+  if there is no way to meet the app's constraints without using a
+  pre-release package.
+
+* Add `meteor admin set-unmigrated` to allow maintainers to hide
+  pre-0.9.0 packages in `meteor search` and `meteor show`. This will not
+  stop users from continuing to use the package, but it helps prevent
+  new users from finding old non-functional packages.
+
+* Progress bars for time-intensive operations, like downloading large
+  packages.
+
+
+### Other Changes
+
+* Offically support `Meteor.wrapAsync` (renamed from
+  `Meteor._wrapAsync`). Additionally, `Meteor.wrapAsync` now lets you
+  pass an object to bind as `this` in the wrapped call. See
+  https://docs.meteor.com/#meteor_wrapasync.
+
+* The `reactive-dict` package now allows an optional name argument to
+  enable data persistence during hot code push.
+
+
+Patches by Github users evliu, meonkeys, mitar, mizzao, mquandalle,
+prapicault, waitingkuo, wulfmeister.
+
+
+
+## v0.9.2.2
+
+* Fix regression in 0.9.2 that prevented some users from accessing the
+  Meteor development server in their browser. Specifically, 0.9.2
+  unintentionally changed the development mode server's default bind
+  host to localhost instead of 0.0.0.0. #2596
+
+
+## v0.9.2.1
+
+* Fix versions of packages that were published with `-cordova` versions
+  in 0.9.2 (appcache, fastclick, htmljs, logging, mobile-status-bar,
+  routepolicy, webapp-hashing).
+
+
+## v0.9.2
+
+This release contains our first support for building mobile apps in
+Meteor, for both iOS and Android. This support comes via an
+integration with Apache's Cordova/PhoneGap project.
+
+  * You can use Cordova/PhoneGap packages in your application or inside
+    a Meteor package to access a device's native functions directly from
+    JavaScript code.
+  * The `meteor add-platform` and `meteor run` commands now let you
+    launch the app in the iOS or Android simulator or run it on an
+    attached hardware device.
+  * This release extends hot code push to support live updates into
+    installed native apps.
+  * The `meteor bundle` command has been renamed to `meteor build` and
+    now outputs build projects for the mobile version of the targeted
+    app.
+  * See
+    https://github.com/meteor/meteor/wiki/Meteor-Cordova-Phonegap-integration
+    for more information about how to get started building mobile apps
+    with Meteor.
+
+* Better mobile support for OAuth login: you can now use a
+  redirect-based flow inside UIWebViews, and the existing popup-based
+  flow has been adapted to work in Cordova/PhoneGap apps.
+
+#### Bug fixes and minor improvements
+
+* Fix sorting on non-trivial keys in Minimongo. #2439
+
+* Bug fixes and performance improvements for the package system's
+  constraint solver.
+
+* Improved error reporting for misbehaving oplog observe driver. #2033 #2244
+
+* Drop deprecated source map linking format used for older versions of
+  Firefox.  #2385
+
+* Allow Meteor tool to run from a symlink. #2462
+
+* Assets added via a plugin are no longer considered source files. #2488
+
+* Remove support for long deprecated `SERVER_ID` environment
+  variable. Use `AUTOUPDATE_VERSION` instead.
+
+* Fix bug in reload-safetybelt package that resulted in reload loops in
+  Chrome with cookies disabled.
+
+* Change the paths for static assets served from packages. The `:`
+  character is replaced with the `_` character in package names so as to
+  allow serving on mobile devices and ease operation on Windows. For
+  example, assets from the `abc:bootstrap` package are now served at
+  `/packages/abc_bootstrap` instead of `/packages/abc:bootstrap`.
+
+* Also change the paths within a bundled Meteor app to allow for
+  different client architectures (eg mobile). For example,
+  `bundle/programs/client` is now `bundle/programs/web.browser`.
+
+
+Patches by Github users awwx, mizzao, and mquandalle.
+
+
+
+## v0.9.1.1
+
+* Fix backwards compatibility for packages that had weak dependencies
+  on packages renamed in 0.9.1 (`ui`, `deps`, `livedata`). #2521
+
+* Fix error when using the `reactive-dict` package without the `mongo`
+  package.
+
+
+## v0.9.1
+
+#### Organizations in Meteor developer accounts
+
+Meteor 0.9.1 ships with organizations support in Meteor developer
+accounts. Organizations are teams of users that make it easy to
+collaborate on apps and packages.
+
+Create an organization at
+https://www.meteor.com/account-settings/organizations. Run the `meteor
+authorized` command in your terminal to give an organization
+permissions to your apps. To add an organization as a maintainer of
+your packages, use the `meteor admin maintainers` command. You can
+also publish packages with an organization's name in the package name
+prefix instead of your own username.
+
+
+#### One backwards incompatible change for templates
+
+* Templates can no longer be named "body" or "instance".
+
+#### Backwards compatible Blaze API changes
+
+* New public and documented APIs:
+  * `Blaze.toHTMLWithData()`
+  * `Template.currentData()`
+  * `Blaze.getView()`
+  * `Template.parentData()` (previously `UI._parentData()`)
+  * `Template.instance()` (previously `UI._templateInstance()`)
+  * `Template.body` (previously `UI.body`)
+  * `new Template` (previously `Template.__create__`)
+  * `Blaze.getData()` (previously `UI.getElementData`, or `Blaze.getCurrentData` with no arguments)
+
+* Deprecate the `ui` package. Instead, use the `blaze` package. The
+  `UI` and `Blaze` symbols are now the same.
+
+* Deprecate `UI.insert`. `UI.render` and `UI.renderWithData` now
+  render a template and place it in the DOM.
+
+* Add an underscore to some undocumented Blaze APIs to make them
+  internal. Notably: `Blaze._materializeView`, `Blaze._createView`,
+  `Blaze._toText`, `Blaze._destroyView`, `Blaze._destroyNode`,
+  `Blaze._withCurrentView`, `Blaze._DOMBackend`,
+  `Blaze._TemplateWith`
+
+* Document Views. Views are the machinery powering DOM updates in
+  Blaze.
+
+* Expose `view` property on template instances.
+
+#### Backwards compatible renames
+
+* Package renames
+  * `livedata` -> `ddp`
+  * `mongo-livedata` -> `mongo`
+  * `standard-app-packages` -> `meteor-platform`
+* Symbol renames
+  * `Meteor.Collection` -> `Mongo.Collection`
+  * `Meteor.Collection.Cursor` -> `Mongo.Cursor`
+  * `Meteor.Collection.ObjectID` -> `Mongo.ObjectID`
+  * `Deps` -> `Tracker`
+
+#### Other
+
+* Add `reactive-var` package. Lets you define a single reactive
+  variable, like a single key in `Session`.
+
+* Don't throw an exception in Chrome when cookies and local storage
+  are blocked.
+
+* Bump DDP version to "1". Clients connecting with version "pre1" or
+  "pre2" should still work.
+
+* Allow query parameters in OAuth1 URLs. #2404
+
+* Fix `meteor list` if not all packages on server. Fixes #2468
+
+Patch by Github user mitar.
+
+
+## v0.9.0.1
+
+* Fix issues preventing hot code reload from automatically reloading webapps in
+  two cases: when the old app was a pre-0.9.0 app, and when the app used
+  appcache. (In both cases, an explicit reload still worked.)
+
+* Fix publishing packages containing a plugin with platform-specific code but
+  no platform-specific code in the main package.
+
+* Fix `meteor add package@version` when the package was already added with a
+  different version constraint.
+
+* Improve treatment of pre-release packages (packages with a dash in their
+  version). Guarantee that they will not be chosen by the constraint solver
+  unless explicitly requested.  `meteor list` won't suggest that you update to
+  them.
+
+* Fix slow spiderable executions.
+
+* Fix dev-mode client-only restart when client files changed very soon after
+  server restart.
+
+* Fix stack trace on `meteor add` constraint solver failure.
+
+* Fix "access-denied" stack trace when publishing packages.
+
+
+## v0.9.0
+
+Meteor 0.9.0 introduces the Meteor Package Server. Incorporating lessons from
+our community's Meteorite tool, Meteor 0.9.0 allows users to develop and publish
+Meteor packages to a central repository. The `meteor publish` command is used to
+publish packages. Non-core packages can now be added with `meteor add`, and you
+can specify version constraints on the packages you use. Binary packages can be
+published for additional architectures with `meteor publish-for-arch`, which
+allows cross-platform deploys and bundling.  You can search for packages with
+`meteor search` and display information on them with `meteor show`, or you can
+use the Atmosphere web interface developed by Percolate Studio at
+https://atmospherejs.com/
+
+See https://docs.meteor.com/#writingpackages and
+https://docs.meteor.com/#packagejs for more details.
+
+Other packaging-related changes:
+
+* `meteor list` now lists the packages your app is using, which was formerly the
+  behavior of `meteor list --using`. To search for packages you are not
+  currently using, use `meteor search`.  The concept of an "internal" package
+  (which did not show up in `meteor list`) no longer exists.
+
+* To prepare a bundle created with `meteor bundle` for execution on a
+  server, you now run `npm install` with no arguments instead of having
+  to specify a few specific npm modules and their versions
+  explicitly. See the README in the generated bundle for more details.
+
+* All `under_score`-style `package.js` APIs (`Package.on_use`, `api.add_files`,
+  etc) have been replaced with `camelCase` names (`Package.onUse`,
+  `api.addFiles`, etc).  The old names continue to work for now.
+
+* There's a new `archMatching` option to `Plugin.registerSourceHandler`, which
+  should be used by any plugin whose output is only for the client or only for
+  the server (eg, CSS and HTML templating packages); this allows Meteor to avoid
+  restarting the server when files processed by these plugins change.
+
+Other changes:
+
+* When running your app with the local development server, changes that only
+  affect the client no longer require restarting the server.  Changes that only
+  affect CSS no longer require the browser to refresh the page, both in local
+  development and in some production environments.  #490
+
+* When a call to `match` fails in a method or subscription, log the
+  failure on the server. (This matches the behavior described in our docs)
+
+* The `appcache` package now defaults to functioning on all browsers
+  that support the AppCache API, rather than a whitelist of browsers.
+  The main effect of this change is that `appcache` is now enabled by
+  default on Firefox, because Firefox no longer makes a confusing
+  popup. You can still disable individual browsers with
+  `AppCache.config`.  #2241
+
+* The `forceApprovalPrompt` option can now be specified in `Accounts.ui.config`
+  in addition to `Meteor.loginWithGoogle`.  #2149
+
+* Don't leak websocket clients in server-to-server DDP in some cases (and fix
+  "Got open from inactive client"
+  error). https://github.com/faye/websocket-driver-node/pull/8
+
+* Updated OAuth url for login with Meetup.
+
+* Allow minimongo `changed` callbacks to mutate their `oldDocument`
+  argument. #2231
+
+* Fix upsert called from client with no callback.  #2413
+
+* Avoid a few harmless exceptions in OplogObserveDriver.
+
+* Refactor `observe-sequence` package.
+
+* Fix `spiderable` race condition.
+
+* Re-apply our fix of NPM bug https://github.com/npm/npm/issues/3265 which got
+  accidentally reverted upstream.
+
+* Workaround for a crash in recent Safari
+  versions. https://github.com/meteor/meteor/commit/e897539adb
+
+* Upgraded dependencies:
+  - less: 1.7.4 (from 1.7.1)
+  - tar: 1.0.1 (from 0.1.19)
+  - fstream: 1.0.2 (from 0.1.25)
+
+Patches by Github users Cangit, dandv, ImtiazMajeed, MaximDubrovin, mitar,
+mquandalle, rcy, RichardLitt, thatneat, and twhy.
+
+
+
+## v0.8.3
+
+#### Blaze
+
+* Refactor Blaze to simplify internals while preserving the public
+  API. `UI.Component` has been replaced with `Blaze.View.`
+
+* Fix performance issues and memory leaks concerning event handlers.
+
+* Add `UI.remove`, which removes a template after `UI.render`/`UI.insert`.
+
+* Add `this.autorun` to the template instance, which is like `Deps.autorun`
+  but is automatically stopped when the template is destroyed.
+
+* Create `<a>` tags as SVG elements when they have `xlink:href`
+  attributes. (Previously, `<a>` tags inside SVGs were never created as
+  SVG elements.)  #2178
+
+* Throw an error in `{{foo bar}}` if `foo` is missing or not a function.
+
+* Cursors returned from template helpers for #each should implement
+  the `observeChanges` method and don't have to be Minimongo cursors
+  (allowing new custom data stores for Blaze like Miniredis).
+
+* Remove warnings when {{#each}} iterates over a list of strings,
+  numbers, or other items that contains duplicates.  #1980
+
+#### Meteor Accounts
+
+* Fix regression in 0.8.2 where an exception would be thrown if
+  `Meteor.loginWithPassword` didn't have a callback. Callbacks to
+  `Meteor.loginWithPassword` are now optional again.  #2255
+
+* Fix OAuth popup flow in mobile apps that don't support
+  `window.opener`.  #2302
+
+* Fix "Email already exists" error with MongoDB 2.6.  #2238
+
+
+#### mongo-livedata and minimongo
+
+* Fix performance issue where a large batch of oplog updates could block
+  the node event loop for long periods.  #2299.
+
+* Fix oplog bug resulting in error message "Buffer inexplicably empty".  #2274
+
+* Fix regression from 0.8.2 that caused collections to appear empty in
+  reactive `findOne()` or `fetch` queries that run before a mutator
+  returns.  #2275
+
+
+#### Miscellaneous
+
+* Stop including code by default that automatically refreshes the page
+  if JavaScript and CSS don't load correctly. While this code is useful
+  in some multi-server deployments, it can cause infinite refresh loops
+  if there are errors on the page. Add the `reload-safetybelt` package
+  to your app if you want to include this code.
+
+* On the server, `Meteor.startup(c)` now calls `c` immediately if the
+  server has already started up, matching the client behavior.  #2239
+
+* Add support for server-side source maps when debugging with
+  `node-inspector`.
+
+* Add `WebAppInternals.addStaticJs()` for adding static JavaScript code
+  to be served in the app, inline if allowed by `browser-policy`.
+
+* Make the `tinytest/run` method return immediately, so that `wait`
+  method calls from client tests don't block on server tests completing.
+
+* Log errors from method invocations on the client if there is no
+  callback provided.
+
+* Upgraded dependencies:
+  - node: 0.10.29 (from 0.10.28)
+  - less: 1.7.1 (from 1.6.1)
+
+Patches contributed by GitHub users Cangit, cmather, duckspeaker, zol.
+
+
+## v0.8.2
+
+#### Meteor Accounts
+
+* Switch `accounts-password` to use bcrypt to store passwords on the
+  server. (Previous versions of Meteor used a protocol called SRP.)
+  Users will be transparently transitioned when they log in. This
+  transition is one-way, so you cannot downgrade a production app once
+  you upgrade to 0.8.2. If you are maintaining an authenticating DDP
+  client:
+     - Clients that use the plaintext password login handler (i.e. call
+       the `login` method with argument `{ password: <plaintext
+       password> }`) will continue to work, but users will not be
+       transitioned from SRP to bcrypt when logging in with this login
+       handler.
+     - Clients that use SRP will no longer work. These clients should
+       instead directly call the `login` method, as in
+       `Meteor.loginWithPassword`. The argument to the `login` method
+       can be either:
+         - `{ password: <plaintext password> }`, or
+         - `{ password: { digest: <password hash>, algorithm: "sha-256" } }`,
+           where the password hash is the hex-encoded SHA256 hash of the
+           plaintext password.
+
+* Show the display name of the currently logged-in user after following
+  an email verification link or a password reset link in `accounts-ui`.
+
+* Add a `userEmail` option to `Meteor.loginWithMeteorDeveloperAccount`
+  to pre-fill the user's email address in the OAuth popup.
+
+* Ensure that the user object has updated token information before
+  it is passed to email template functions. #2210
+
+* Export the function that serves the HTTP response at the end of an
+  OAuth flow as `OAuth._endOfLoginResponse`. This function can be
+  overridden to make the OAuth popup flow work in certain mobile
+  environments where `window.opener` is not supported.
+
+* Remove support for OAuth redirect URLs with a `redirect` query
+  parameter. This OAuth flow was never documented and never fully
+  worked.
+
+
+#### Blaze
+
+* Blaze now tracks individual CSS rules in `style` attributes and won't
+  overwrite changes to them made by other JavaScript libraries.
+
+* Add `{{> UI.dynamic}}` to make it easier to dynamically render a
+  template with a data context.
+
+* Add `UI._templateInstance()` for accessing the current template
+  instance from within a block helper.
+
+* Add `UI._parentData(n)` for accessing parent data contexts from
+  within a block helper.
+
+* Add preliminary API for registering hooks to run when Blaze intends to
+  insert, move, or remove DOM elements. For example, you can use these
+  hooks to animate nodes as they are inserted, moved, or removed. To use
+  them, you can set the `_uihooks` property on a container DOM
+  element. `_uihooks` is an object that can have any subset of the
+  following three properties:
+
+    - `insertElement: function (node, next)`: called when Blaze intends
+      to insert the DOM element `node` before the element `next`
+    - `moveElement: function (node, next)`: called when Blaze intends to
+      move the DOM element `node` before the element `next`
+    - `removeElement: function (node)`: called when Blaze intends to
+      remove the DOM element `node`
+
+    Note that when you set one of these functions on a container
+    element, Blaze will not do the actual operation; it's your
+    responsibility to actually insert, move, or remove the node (by
+    calling `$(node).remove()`, for example).
+
+* The `findAll` method on template instances now returns a vanilla
+  array, not a jQuery object. The `$` method continues to
+  return a jQuery object. #2039
+
+* Fix a Blaze memory leak by cleaning up event handlers when a template
+  instance is destroyed. #1997
+
+* Fix a bug where helpers used by {{#with}} were still re-running when
+  their reactive data sources changed after they had been removed from
+  the DOM.
+
+* Stop not updating form controls if they're focused. If a field is
+  edited by one user while another user is focused on it, it will just
+  lose its value but maintain its focus. #1965
+
+* Add `_nestInCurrentComputation` option to `UI.render`, fixing a bug in
+  {{#each}} when an item is added inside a computation that subsequently
+  gets invalidated. #2156
+
+* Fix bug where "=" was not allowed in helper arguments. #2157
+
+* Fix bug when a template tag immediately follows a Spacebars block
+  comment. #2175
+
+
+#### Command-line tool
+
+* Add --directory flag to `meteor bundle`. Setting this flag outputs a
+  directory rather than a tarball.
+
+* Speed up updates of NPM modules by upgrading Node to include our fix for
+  https://github.com/npm/npm/issues/3265 instead of passing `--force` to
+  `npm install`.
+
+* Always rebuild on changes to npm-shrinkwrap.json files.  #1648
+
+* Fix uninformative error message when deploying to long hostnames. #1208
+
+* Increase a buffer size to avoid failing when running MongoDB due to a
+  large number of processes running on the machine, and fix the error
+  message when the failure does occur. #2158
+
+* Clarify a `meteor mongo` error message when using the MONGO_URL
+  environment variable. #1256
+
+
+#### Testing
+
+* Run server tests from multiple clients serially instead of in
+  parallel. This allows testing features that modify global server
+  state.  #2088
+
+
+#### Security
+
+* Add Content-Type headers on JavaScript and CSS resources.
+
+* Add `X-Content-Type-Options: nosniff` header to
+  `browser-policy-content`'s default policy. If you are using
+  `browser-policy-content` and you don't want your app to send this
+  header, then call `BrowserPolicy.content.allowContentTypeSniffing()`.
+
+* Use `Meteor.absoluteUrl()` to compute the redirect URL in the `force-ssl`
+  package (instead of the host header).
+
+
+#### Miscellaneous
+
+* Allow `check` to work on the server outside of a Fiber. #2136
+
+* EJSON custom type conversion functions should not be permitted to yield. #2136
+
+* The legacy polling observe driver handles errors communicating with MongoDB
+  better and no longer gets "stuck" in some circumstances.
+
+* Automatically rewind cursors before calls to `fetch`, `forEach`, or `map`. On
+  the client, don't cache the return value of `cursor.count()` (consistently
+  with the server behavior). `cursor.rewind()` is now a no-op. #2114
+
+* Remove an obsolete hack in reporting line numbers for LESS errors. #2216
+
+* Avoid exceptions when accessing localStorage in certain Internet
+  Explorer configurations. #1291, #1688.
+
+* Make `handle.ready()` reactively stop, where `handle` is a
+  subscription handle.
+
+* Fix an error message from `audit-argument-checks` after login.
+
+* Make the DDP server send an error if the client sends a connect
+  message with a missing or malformed `support` field. #2125
+
+* Fix missing `jquery` dependency in the `amplify` package. #2113
+
+* Ban inserting EJSON custom types as documents. #2095
+
+* Fix incorrect URL rewrites in stylesheets. #2106
+
+* Upgraded dependencies:
+  - node: 0.10.28 (from 0.10.26)
+  - uglify-js: 2.4.13 (from 2.4.7)
+  - sockjs server: 0.3.9 (from 0.3.8)
+  - websocket-driver: 0.3.4 (from 0.3.2)
+  - stylus: 0.46.3 (from 0.42.3)
+
+Patches contributed by GitHub users awwx, babenzele, Cangit, dandv,
+ducdigital, emgee3, felixrabe, FredericoC, jbruni, kentonv, mizzao,
+mquandalle, subhog, tbjers, tmeasday.
+
+
+## v.0.8.1.3
+
+* Fix a security issue in the `spiderable` package. `spiderable` now
+  uses the ROOT_URL environment variable instead of the Host header to
+  determine which page to snapshot.
+
+* Fix hardcoded Twitter URL in `oauth1` package. This fixes a regression
+  in 0.8.0.1 that broke Atmosphere packages that do OAuth1
+  logins. #2154.
+
+* Add `credentialSecret` argument to `Google.retrieveCredential`, which
+  was forgotten in a previous release.
+
+* Remove nonexistent `-a` and `-r` aliases for `--add` and `--remove` in
+  `meteor help authorized`. #2155
+
+* Add missing `underscore` dependency in the `oauth-encryption` package. #2165
+
+* Work around IE8 bug that caused some apps to fail to render when
+  minified. #2037.
+
+
+## v.0.8.1.2
+
+* Fix memory leak (introduced in 0.8.1) by making sure to unregister
+  sessions at the server when they are closed due to heartbeat timeout.
+
+* Add `credentialSecret` argument to `Google.retrieveCredential`,
+  `Facebook.retrieveCredential`, etc., which is needed to use them as of
+  0.8.1. #2118
+
+* Fix 0.8.1 regression that broke apps using a `ROOT_URL` with a path
+  prefix. #2109
+
+
+## v0.8.1.1
+
+* Fix 0.8.1 regression preventing clients from specifying `_id` on insert. #2097
+
+* Fix handling of malformed URLs when merging CSS files. #2103, #2093
+
+* Loosen the checks on the `options` argument to `Collection.find` to
+  allow undefined values.
+
+
+## v0.8.1
+
+#### Meteor Accounts
+
+* Fix a security flaw in OAuth1 and OAuth2 implementations. If you are
+  using any OAuth accounts packages (such as `accounts-google` or
+  `accounts-twitter`), we recommend that you update immediately and log
+  out your users' current sessions with the following MongoDB command:
+
+    $ db.users.update({}, { $set: { 'services.resume.loginTokens': [] } }, { multi: true });
+
+* OAuth redirect URLs are now required to be on the same origin as your app.
+
 * Log out a user's other sessions when they change their password.
 
-* Move boilerplate HTML from tools to webapp. Changes internal
-  Webapp.addHtmlAttributeHook API incompatibly.
+* Store pending OAuth login results in the database instead of
+  in-memory, so that an OAuth flow succeeds even if different requests
+  go to different server processes.
+
+* When validateLoginAttempt callbacks return false, don't override a more
+  specific error message.
+
+* Add `Random.secret()` for generating security-critical secrets like
+  login tokens.
+
+* `Meteor.logoutOtherClients` now calls the user callback when other
+  login tokens have actually been removed from the database, not when
+  they have been marked for eventual removal.  #1915
+
+* Rename `Oauth` to `OAuth`.  `Oauth` is now an alias for backwards
+  compatibility.
+
+* Add `oauth-encryption` package for encrypting sensitive account
+  credentials in the database.
+
+* A validate login hook can now override the exception thrown from
+  `beginPasswordExchange` like it can for other login methods.
+
+* Remove an expensive observe over all users in the `accounts-base`
+  package.
+
+
+#### Blaze
+
+* Disallow `javascript:` URLs in URL attribute values by default, to
+  help prevent cross-site scripting bugs. Call
+  `UI._allowJavascriptUrls()` to allow them.
+
+* Fix `UI.toHTML` on templates containing `{{#with}}`.
+
+* Fix `{{#with}}` over a data context that is mutated.  #2046
+
+* Clean up autoruns when calling `UI.toHTML`.
+
+* Properly clean up event listeners when removing templates.
+
+* Add support for `{{!-- block comments --}}` in Spacebars. Block comments may
+  contain `}}`, so they are more useful than `{{! normal comments}}` for
+  commenting out sections of Spacebars templates.
+
+* Don't dynamically insert `<tbody>` tags in reactive tables
+
+* When handling a custom jQuery event, additional arguments are
+  no longer lost -- they now come after the template instance
+  argument.  #1988
+
+
+#### DDP and MongoDB
+
+* Extend latency compensation to support an arbitrary sequence of
+  inserts in methods.  Previously, documents created inside a method
+  stub on the client would eventually be replaced by new documents
+  from the server, causing the screen to flicker.  Calling `insert`
+  inside a method body now generates the same ID on the client (inside
+  the method stub) and on the server.  A sequence of inserts also
+  generates the same sequence of IDs.  Code that wants a random stream
+  that is consistent between method stub and real method execution can
+  get one with `DDP.randomStream`.
+  https://trello.com/c/moiiS2rP/57-pattern-for-creating-multiple-database-records-from-a-method
+
+* The document passed to the `insert` callback of `allow` and `deny` now only
+  has a `_id` field if the client explicitly specified one; this allows you to
+  use `allow`/`deny` rules to prevent clients from specifying their own
+  `_id`. As an exception, `allow`/`deny` rules with a `transform` always have an
+  `_id`.
+
+* DDP now has an implementation of bidirectional heartbeats which is consistent
+  across SockJS and websocket transports. This enables connection keepalive and
+  allows servers and clients to more consistently and efficiently detect
+  disconnection.
+
+* The DDP protocol version number has been incremented to "pre2" (adding
+  randomSeed and heartbeats).
+
+* The oplog observe driver handles errors communicating with MongoDB
+  better and knows to re-poll all queries after a MongoDB failover.
+
+* Fix bugs involving mutating DDP method arguments.
+
+
+#### meteor command-line tool
+
+* Move boilerplate HTML from tools to webapp.  Change internal
+  `Webapp.addHtmlAttributeHook` API.
+
+* Add `meteor list-sites` command for listing the sites that you have
+  deployed to meteor.com with your Meteor developer account.
+
+* Third-party template languages can request that their generated source loads
+  before other JavaScript files, just like *.html files, by passing the
+  isTemplate option to Plugin.registerSourceHandler.
+
+* You can specify a particular interface for the dev mode runner to bind to with
+  `meteor -p host:port`.
+
+* Don't include proprietary tar tags in bundle tarballs.
+
+* Convert relative URLs to absolute URLs when merging CSS files.
+
+
+#### Upgraded dependencies
+
+* Node.js from 0.10.25 to 0.10.26.
+* MongoDB driver from 1.3.19 to 1.4.1
+* stylus: 0.42.3 (from 0.42.2)
+* showdown: 0.3.1
+* css-parse: an unreleased version (from 1.7.0)
+* css-stringify: an unreleased version (from 1.4.1)
+
+
+Patches contributed by GitHub users aldeed, apendua, arbesfeld, awwx, dandv,
+davegonzalez, emgee3, justinsb, mquandalle, Neftedollar, Pent, sdarnell,
+and timhaines.
+
+
+## v0.8.0.1
+
+* Fix security flaw in OAuth1 implementation. Clients can no longer
+  choose the callback_url for OAuth1 logins.
 
 
 ## v0.8.0

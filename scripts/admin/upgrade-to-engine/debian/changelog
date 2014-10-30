@@ -1,4 +1,4 @@
-meteor (0.6.0-1) unstable; urgency=low
+meteor (1.0.0-1) unstable; urgency=low
 
   * Automated debian build.
 

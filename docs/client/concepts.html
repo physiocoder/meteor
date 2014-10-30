@@ -9,7 +9,7 @@ Meteor è tutto ciò che avremmo voluto per scrivere queste applicazioni.
 
 {{> whatismeteor }}
 {{> structure }}
-{{> data }}
+{{> data_ }}
 {{> reactivity }}
 {{> livehtmltemplates }}
 {{> packages_concept }}
@@ -27,7 +27,8 @@ Meteor è tutto ciò che avremmo voluto per scrivere queste applicazioni.
 Meteor è due cose:
 
 * Una _libreria di package_: moduli già scritti ed indipendenti che puoi
-utilizzare nell'applicazione.<br>
+utilizzare nell'applicazione.
+
 Esitono una dozzina circa di package core in Meteor utilizzati da
 praticamente tutte le app (ad esempio `webapp`, che gestisce le
 connessioni HTTP, o `templating`, che permette di scrivere template
@@ -39,7 +40,8 @@ utenti pronto all'uso. Oltre a questi package "ufficiali" ce ne sono
 centinaia scritti dalla comunità in [Atmosphere](https://atmosphere.meteor.com/),
 che potrebbero già fare esattamente ciò che serve.
 
-* Una _applicazione a linea di comando_ chiamata `meteor`.<br>
+* Una _applicazione a linea di comando_ chiamata `meteor`.
+
 `meteor` è un'applicazione simile a `make`, `rake`, oppure ai tool non
 visuali di Visual Studio. Mette insieme tutti i file sorgenti e gli
 asset dell'applicazione, esegue tutti i passi necessari a costruirla
@@ -59,14 +61,6 @@ dovrebbe funzionare allo stesso modo nel browser e sul server_
 email ed il server non può gestire gli eventi del mouse). Tutto
 l'ecosistema è stato costruito per supportare questo principio.
 
-{{#note}}
-`meteor` non può installare package da Atmosphere. Se si utilizzano
-package di Atmosphere bisogna usare [Meteorite](http://oortcloud.github.io/meteorite/),
-un'applicazione che gestisce ed installa i package di Atmosphere.
-
-In Meteor 1.0, `meteor` incorporerà il pieno supporto ad Atmosphere.
-{{/note}}
-
 {{/markdown}}
 </template>
 
@@ -75,100 +69,207 @@ In Meteor 1.0, `meteor` incorporerà il pieno supporto ad Atmosphere.
 
 <h2 id="strutturadiunapp">Struttura di una applicazione</h2>
 
-Una applicazione Meteor è un mix di JavaScript eseguito nel browser,
+Una applicazione Meteor è un mix di JavaScript eseguito nel browser o in un'app PhoneGap,
 JavaScript eseguito dal server di Meteor in un'istanza di [Node.js](http://nodejs.org),
 più tutto l'HTML di supporto, regole CSS e asset statici (immagini, icone,
 fonts...). Meteor automatizza la gestione e l'assemblaggio di questi
 componenti. Inoltre lascia un buon grado di libertà sull'organizzazione
 di file e cartelle che contengono questi componenti.
 
-Lato server vengono visti solo i file JavaScript ed i file contenuti
-nella cartella `private`. Meteor raggruppa tutti i file
-JavaScript, esclusi quelli nelle cartelle `client`, `public` e
-`private` e li serve ad una istanza di Node.js in una fiber. In Meteor,
-il codice server-side viene eseguito in un singolo thread per richiesta,
-non come callback asincrona tipica di Node. Abbiamo scelto il modello
-di esecuzione lineare sincrono perchè ci sembra più adatto per il
-codice server di una applicazione Meteor.
+### Special Directories
 
-Tutti i file nella cartella `private` sono resi disponibili al
-solo codice server attraverso l'API [`Assets`](#assets). La cartella
-`private` deve essere usata per conservare i file accessibili al codice
-server side ma che non devono essere trasferiti al client, cioè i dati
-privati, appunto.
+By default, any JavaScript files in your Meteor folder are bundled and sent to
+the client and the server. However, the names of the files and directories
+inside your project can affect their load order, where they are loaded, and some
+other characteristics. Here is a list of file and directory names that are
+treated specially by Meteor:
 
-Lato client vengono gestite anche altre risorse. Meteor mette insieme
-e rende disponibili al client tutti i file del progetto ad
-esclusione delle cartelle `server`, `public` e `private`.
-I file vengono compressi e trasferiti ad ogni client. Si è liberi di
-usare un unico file JavaScript per l'intera applicazione o creare una
-struttura ad albero di file singoli, o una via di mezzo. 
+- **client**
 
-Alcune librerie JavaScript funzionano solo se messe in
-`client/compatibility`. I file in questa cartella sono eseguiti senza
-essere inglobati nello scope di una nuova variabile. Significa che ogni
-`var` non locale definisce una variabile globale. Inoltre questi file
-vengono eseguiti prima degli altri file JavaScript client side.
+    Any directory named `client` is not loaded on the server. Similar to
+    wrapping your code in `if (Meteor.isClient) { ... }`. All files loaded on
+    the client are automatically concatenated and minified when in production
+    mode. In development mode, each file is sent individually for easier
+    debugging.
+    
+    HTML files in a Meteor application are treated quite a bit differently
+    from a server-side framework.  Meteor scans all the HTML files in your
+    directory for three top-level elements: `<head>`, `<body>`, and
+    `<template>`.  The head and body sections are separately concatenated
+    into a single head and body, which are transmitted to the client on
+    initial page load.       
 
-Il file esterni alle cartelle `client`, `server` e `tests` vengono
-caricati sia sul client che sul server! E' dove possiamo definire la
-nostra base dati (il modello) e le altre funzioni. Meteor permette di
-consultare le variabili [`isClient`](#meteor_isclient) e [`isServer`](#meteor_isserver)
-per eseguire codice solo lato client o solo lato server. (I file della
-cartella `tests` non vengono caricati da nessuna parte.)
+- **server**
 
-Tutto il codice riservato che non si vuole rendere visibile lato
-client, come il codice che contiene password o meccanismi di
-autenticazione, dovrebbe stare nella cartella `server`.
+    Any directory named `server` is not loaded on the client. Similar to
+    wrapping your code in `if (Meteor.isServer) { ... }`, except the client
+    never even receives the code. Any sensitive code that you don't want served
+    to the client, such as code containing passwords or authentication
+    mechanisms, should be kept in the `server` directory.
+    
+    Meteor gathers all your JavaScript files, excluding anything under the
+    `client`, `public`, and `private` subdirectories, and loads them into a
+    Node.js server instance.  In Meteor, your server code runs in a single
+    thread per request, not in the asynchronous callback style typical of Node.
+    We find the linear execution model a better fit for the typical server code
+    in a Meteor application.
 
-Anche i file CSS sono raggruppati insieme: il client riceverà un unico
-file con tutti i CSS (esclusi quelli eventualmente contenuti nelle
-cartelle `server`, `public` e `private`).
+- **public**
 
-In modalità debug i file JavaScript e CSS sono inviati divisi per
-rendere il debug più semplice.
+    All files inside a top-level directory called `public` are served as-is to
+    the client. When referencing these assets, do not include `public/` in the
+    URL, write the URL as if they were all in the top level. For example,
+    reference `public/bg.png` as `<img src='/bg.png' />`. This is the best place
+    for `favicon.ico`, `robots.txt`, and similar files.
 
-I file HTML in Meteor sono gestiti diversamente dagli altri framework
-server-side. Meteor legge tutti i file HTML alla ricerca degli elementi
-`<head>`, `<body>` e `<template>` nella radice della struttura.
-Le sezioni head e body sono unite in un unico file trasmesso al client
-al momento del caricamenteo iniziale dell'applicazione.
+- **private**
 
-Le sezioni template invece sono convertite in funzioni JavaScript
-disponibili nel namespace `Template`. E' un modo molto efficiente di
-fornire i template HTML al client.
-Si può consultare la sezione [templates](#templatehtmllive) per ulteriori
-dettagli.
+    All files inside a top-level directory called `private` are only accessible
+    from server code and can be loaded via the [`Assets`](#assets) API. This can
+    be used for private data files and any files that are in your project
+    directory that you don't want to be accessible from the outside.
 
-Infine il server Meteor rende disponibili i file nella cartella `public`
-allo stesso modo dei framework Rails o Django. Qui mettiamo le
-immagini, `favicon.ico`, `robots.txt` e tutto il resto.
+- **client/compatibility**
 
-E' buona norma scrivere la nostra applicaziome in modo che sia
-indipendente dall'ordine con cui i file vengono caricati, ad esempio
-usando [Meteor.startup](#meteor_startup), o spostando il codice che
-dipende da un particolare ordine di caricamento nei [packages](#usingpackages)
-dove si può esplicitamente controllare l'ordine di caricamento del
-proprio contenuto e dello stesso package rispetto agli altri.
-Ciò nonostante a volte è impossibile evitare di dipendere da un preciso ordine
-di caricamento. I file JavaScript e CSS vengono caricati seguendo queste regole:
+    This folder is for compatibility JavaScript libraries that rely on variables
+    declared with var at the top level being exported as globals.  Files in this
+    directory are executed without being wrapped in a new variable scope.  These
+    files are executed before other client-side JavaScript fies.
 
-* I file nelle sottodirectory vengono caricati prima dei file presenti nelle
-  directory padre, quindi i file nelle subdirectory più annidate sono i primi ad
-  essere caricati, mentre quelli nella directory principale sono gli ultimi.
+- **tests**
 
-* Nella stessa cartella i file sono caricati in ordine alfabetico.
+    Any directory named `tests` is not loaded anywhere. Use this for any local
+    test code.
 
-* Dopo il riordino sopra descritto, tutti i file nella directory `lib` vengono
-  caricati prima di tutti gli altri (preservando il loro ordine).
+### Files outside special directories
 
-* Infine tutti i file denominati `main.*` vengono caricati dopo tutti gli altri
-  (preservando il loro ordine).
+All JavaScript files outside special directories are loaded on both the client
+and the server.  That's the place for model definitions and other functions.
+Meteor provides the variables [`Meteor.isClient`](#meteor_isclient) and
+[`Meteor.isServer`](#meteor_isserver) so that your code can alter its behavior
+depending on whether it's running on the client or the server.
+
+CSS and HTML files outside special directories are loaded on the client only,
+and cannot be used from server code.
+
+### Example File Structure
+
+The file structure of your Meteor app is very flexible. Here is an example layout that takes advantage of some of the special folders mentioned above.
+
+```bash
+lib/                      # common code like collections and utilities
+lib/methods.js            # Meteor.methods definitions
+lib/constants.js          # constants used in the rest of the code
+
+client/compatibility      # legacy libraries that expect to be global
+client/lib/               # code for the client to be loaded first
+client/lib/helpers.js     # useful helpers for your client code
+client/body.html          # content that goes in the <body> of your HTML
+client/head.html          # content for <head> of your HTML: <meta> tags, etc
+client/style.css          # some CSS code
+client/<feature>.html     # HTML templates related to a certain feature
+client/<feature>.js       # JavaScript code related to a certain feature
+
+server/lib/permissions.js # sensitive permissions code used by your server
+server/publications.js    # Meteor.publish definitions
+
+public/favicon.ico        # app icon
+
+settings.json             # configuration data to be passed to meteor --settings
+mobile-config.js          # define icons and metadata for Android/iOS
+```
+
+You can also model your directory structure after the example apps. Run `meteor
+create --example todos` and explore the directories to see where all the files
+in a real app could go.
+
+### File Load Order
+
+It is best to write your application in such a way that it is insensitive to the
+order in which files are loaded, for example by using
+[Meteor.startup](#meteor_startup), or by moving load order sensitive code into
+[packages](#usingpackages), which can explicitly control both the load order of
+their contents and their load order with respect to other packages. However
+sometimes load order dependencies in your application are unavoidable.
+
+When not using special filenames and directories: 
+
+- Files in subdirectories are loaded before files in parent directories, so that
+files in the deepest subdirectory are loaded first, and files in the root
+directory are loaded last. - Within a directory, files are loaded in
+alphabetical order by filename.
+
+Below is a complete list of special file and directory names that control file
+load order:
+
+- **lib**
+
+    After sorting as described above, all files under directories named `lib`
+    are moved before everything else, preserving their order.
+
+- **main.***
+
+    All files that match `main.*` are moved after everything else, preserving
+    their order.
+
+
+
+### Organizing Your Project
+
+There are three main ways to organize your files into features or components.
+Let's say we have two types of objects in our project: **apples** and
+**oranges**.
+
+#### Method 1: Root-Level Folders
+
+Since the special `client`, `server`, and `lib` directories work if they are
+anywhere in the path, you can use top-level folders to organize code into
+modules:
+
+```bash
+apples/lib/               # code for apple-related features
+apples/client/
+apples/server/
+
+oranges/lib/              # code for orange-related features
+oranges/client/
+oranges/server/
+```
+
+#### Method 2: Folders inside client/ and server/
+
+```bash
+lib/apples/               # common code for apples
+lib/oranges/              # and oranges
+
+client/apples/            # client code for apples
+client/oranges/           # and oranges
+
+server/apples/            # server code for apples
+server/oranges/           # and oranges
+```
+
+#### Method 3: Packages
+
+This is the ultimate in code separation, modularity, and reusability. If you put
+the code for each feature in a separate package, the code for one feature won't
+be able to access the code for the other feature except through exports, making
+every dependency explicit. This also allows for the easiest independent testing
+of features. You can also publish the packages and use them in multiple apps
+with `meteor add`.
+
+```bash
+packages/apples/package.js     # files, dependencies, exports for apple feature
+packages/apples/<anything>.js  # file loading is controlled by package.js
+
+packages/oranges/package.js    # files, dependencies, exports for orange feature
+packages/oranges/<anything>.js # file loading is controlled by package.js
+```
 
 {{/markdown}}
 </template>
 
-<template name="data">
+<template name="data_">
 {{#markdown}}
 
 <h2 id="datiesicurezza">Dati e sicurezza</h2>
@@ -203,22 +304,24 @@ set cambiano, il server aggiorna le cache di tutti i client.
 
 Ad oggi la maggior parte delle applicazioni sviluppate con Meteor usa
 MongoDB perchè è quello meglio supportato, ma è già previsto in futuro
-il supporto per altri database. La classe [Meteor.Collection](http://docs.meteor.com/#meteor_collection)
+il supporto per altri database. La classe [Meteor.Collection](http://docs.meteor.com/#mongo_collection)
 è utilizzata per dichiarare collezioni in Mongo e manipolarle. Grazie a
 `minimongo`, l’emulatore di Mongo che gira nel browser,
 `Meteor.Collection` può essere usata sia lato client che server.
 
-    // declare collections
-    // this code should be included in both the client and the server
-    Rooms = new Meteor.Collection("rooms");
-    Messages = new Meteor.Collection("messages");
-    Parties = new Meteor.Collection("parties");
+```js
+// declare collections
+// this code should be included in both the client and the server
+Rooms = new Mongo.Collection("rooms");
+Messages = new Mongo.Collection("messages");
+Parties = new Mongo.Collection("parties");
 
-    // server: populate collections with some initial documents
-    Rooms.insert({name: "Conference Room A"});
-    var myRooms = Rooms.find({}).fetch();
-    Messages.insert({text: "Hello world", room: myRooms[0]._id});
-    Parties.insert({name: "Super Bowl Party"});
+// server: populate collections with some initial documents
+Rooms.insert({name: "Conference Room A"});
+var myRooms = Rooms.find({}).fetch();
+Messages.insert({text: "Hello world", room: myRooms[0]._id});
+Parties.insert({name: "Super Bowl Party"});
+```
 
 Ogni set di documenti è definito da una funzione di pubblicazione
 sul server. La funzione di pubblicazione viene eseguita ogni volta che
@@ -226,23 +329,25 @@ un nuovo client sottoscrive quel set di documenti. I dati che
 compongono un set di documenti possono provenire da qualsiasi fonte, ma
 la cosa più probabile è che provengano da una query sul database.
 
-    // server: publish all room documents
-    Meteor.publish("all-rooms", function () {
-      return Rooms.find(); // everything
-    });
+```js
+// server: publish all room documents
+Meteor.publish("all-rooms", function () {
+  return Rooms.find(); // everything
+});
 
-    // server: publish all messages for a given room
-    Meteor.publish("messages", function (roomId) {
-      check(roomId, String);
-      return Messages.find({room: roomId});
-    });
+// server: publish all messages for a given room
+Meteor.publish("messages", function (roomId) {
+  check(roomId, String);
+  return Messages.find({room: roomId});
+});
 
-    // server: publish the set of parties the logged-in user can see.
-    Meteor.publish("parties", function () {
-      return Parties.find({$or: [{"public": true},
-                                 {invited: this.userId},
-                                 {owner: this.userId}]});
-    });
+// server: publish the set of parties the logged-in user can see.
+Meteor.publish("parties", function () {
+  return Parties.find({$or: [{"public": true},
+                             {invited: this.userId},
+                             {owner: this.userId}]});
+});
+```
 
 Le funzioni di pubblicazione possono fornire risultati diversi per ogni
 client. Nell’esempio sopra un utente loggato può vedere solo documenti
@@ -256,11 +361,13 @@ Inoltre sono limitate al contenuto della cache: sul client una query su
 tutti i documenti restituirà solo i documenti che il server ha
 pubblicato per quel client.
 
-    // client: start a parties subscription
-    Meteor.subscribe("parties");
+```js
+// client: start a parties subscription
+Meteor.subscribe("parties");
 
-    // client: return array of Parties this client can read
-    return Parties.find().fetch(); // synchronous!
+// client: return array of Parties this client can read
+return Parties.find().fetch(); // synchronous!
+```
 
 Dal lato client possiamo poi decidere di attivare e disattivare le
 sottoscrizioni per regolare la quantità di dati mantenuta nella cache e
@@ -276,16 +383,18 @@ sviluppatore ha scritto sotto forma di funzioni Javascript. A questo
 punto il server accetta i cambiamenti se tutte le regole sono
 rispettate.
 
-    // server: don't allow client to insert a party
-    Parties.allow({
-      insert: function (userId, party) {
-        return false;
-      }
-    });
+```js
+// server: don't allow client to insert a party
+Parties.allow({
+  insert: function (userId, party) {
+    return false;
+  }
+});
 
-    // client: this will fail
-    var party = { ... };
-    Parties.insert(party);
+// client: this will fail
+var party = { ... };
+Parties.insert(party);
+```
 
 Se il server accetta le modifiche, le applica al database e
 automaticamente le propaga a tutti i client che hanno sottoscritto i
@@ -318,8 +427,8 @@ Le future versioni avranno il supporto per altri database.
 <h3 id="dataandsecurity-authentication">Autenticazione e gestione utenti</h3>
 
 Meteor include un sistema di autenticazione all'avanguardia: [Meteor
-Accounts](#account_api). Prevede la gestione dei login con password
-tramite [Secure Remote Password control](http://en.wikipedia.org/wiki/Secure_Remote_Password_protocol),
+Accounts](#account_api). Prevede la gestione sicura dei login con password
+tramite l'algoritmo [bcrypt](http://en.wikipedia.org/wiki/Bcrypt),
 oppure attraverso l'integrazione con servizi esterni come Facebook,
 GitHub, Google, Meetup, Twitter e Weibo. Meteor Accounts crea una
 collezione [`Meteor.users`](#meteor_users) dove possono essere
@@ -343,10 +452,10 @@ tipo di ogni variabile utilizzata, è tuttavia utile assicurarsi che gli
 argomenti passati dal client ai metodi ed alle funzioni di pubblicazione
 siano esattamente del tipo atteso.
 
-Meteor fornisce una [mini libreria](#match) per controllare che gli argomenti
-e gli altri valori siano del tipo atteso. Basta invocare dei controlli del
-tipo `check(username, String)` oppure `check(office, {building: String, room: Number})`
-prima di chiamare ogni funzione. La chiamata a `check` produrrà un errore se
+Meteor fornisce una [mini libreria](#check_package) per controllare che gli argomenti
+e gli altri valori siano del tipo atteso. Basta invocare all'interno della funzione dei
+controlli del tipo `check(username, String)` oppure `check(office, {building: String, room: Number})`.
+La chiamata a `check` produrrà un errore se
 l'argomento passato non è del tipo specificato.
 
 Meteor fornisce anche un metodo veloce per accertarsi che tutti i metodi e le
@@ -368,7 +477,7 @@ Significa che il codice può essere scritto in semplice stile imperativo ma
 verrà rieseguito automaticamente ogni volta che i dati da cui dipende saranno
 modificati.
 
-    Deps.autorun(function () {
+    Tracker.autorun(function () {
       Meteor.subscribe("messages", Session.get("currentRoomId"));
     });
 
@@ -379,7 +488,7 @@ automaticamente rieseguita, ed una nuova sottoscrizione andrà a sostituire la
 precedente.
 
 Questo aggiornamento automatico si ottiene attraverso la cooperazione tra
-`Session` e `Deps.autorun`. `Deps.autorun` decide quando eseguire una
+`Session` e `Tracker.autorun`. `Tracker.autorun` decide quando eseguire una
 "elaborazione reattiva" delle funzioni passate come argomento, cioè al variare
 dei dati da cui ogni funzione dipende. I dati, come ad esempio quelli forniti
 dall'oggetto `Session`, sanno quale codice li monitorizza e si occupano di
@@ -396,9 +505,9 @@ conseguenza di introdurre bug.
 Queste funzioni in Meteor permettono di scrivere codice che sarà eseguito in
 maniera reattiva:
 
-* [Templates](#templatehtmllive)
-* [`Deps.autorun`](#deps_autorun)
-* [`UI.render`](#ui_render) and [`UI.renderWithData`](#ui_renderwithdata)
+* [Templates](#livehtmltemplates)
+* [`Tracker.autorun`](#tracker_autorun)
+* [`Blaze.render`](#blaze_render) and [`Blaze.renderWithData`](#blaze_renderwithdata)
 
 Mentre le sorgenti dati reattive che possono scatenare la riesecuzione sono:
 
@@ -414,13 +523,13 @@ Inoltre le seguenti funzioni che ritornano un oggetto con un metodo
 `stop`, vengono interrote quando il ricalcolo viene eseguito o fermato, se
 usate nel codice ad esecuzione reattiva.
 
-* [`Deps.autorun`](#deps_autorun) (annidata)
+* [`Tracker.autorun`](#tracker_autorun) (annidata)
 * [`Meteor.subscribe`](#meteor_subscribe)
 * [`observe()`](#observe) e [`observeChanges()`](#observe_changes) sui cursori
 
 Tutto ciò in Meteor è
-[implementato](https://github.com/meteor/meteor/blob/master/packages/deps/deps.js)
-in un package chiamato [`Deps`](#deps) piuttosto piccolo e facilmente
+[implementato](https://github.com/meteor/meteor/blob/master/packages/tracker/tracker.js)
+in un package chiamato [`Tracker`](#tracker) piuttosto piccolo e facilmente
 comprensibile. Lo si può usare per implementare nuove sorgenti dati reattive.
 
 {{/markdown}}
@@ -453,7 +562,7 @@ reattivi quando viene compilato.
 {{#note}}
   Ad oggi l'unico sistema di templating integrato in Meteor è Spacebar, ma la
   comunità degli sviluppatori ha già creato package per altri linguaggi come
-  [Jade](https://atmospherejs.com/package/jade).
+  [Jade](https://atmospherejs.com/mquandalle/jade).
 {{/note}}
 
 Per costruire un template basta creare un file nel progetto con
@@ -470,48 +579,63 @@ l'operatore `{{dstache}}> inclusion}}`.
 
 Il modo più semplice per mettere dei dati nei template è attraverso la
 definizione di funzioni helper in Javascript. Basta aggiungere le
-funzioni helper direttamente all'oggetto `Template.`*templateName*.
+funzioni helper con la funzione `Template.templateName.helpers({ ... })`
 Vediamo come si fa:
 
-    <!-- in myapp.html -->
-    <body>
-      <h1>Today's weather!</h1>
-      {{dstache}}> forecast}}
-    </body>
+```html
+<!-- in myapp.html -->
+<body>
+  <h1>Today's weather!</h1>
+  {{dstache}}> forecast}}
+</body>
 
-    <template name="forecast">
-      <div>It'll be {{dstache}}prediction}} tonight</div>
-    {{lt}}/template>
+<template name="forecast">
+  <div>It'll be {{dstache}}prediction}} tonight</div>
+{{lt}}/template>
+```
 
-    // in client/myapp.js: reactive helper function
-    Template.forecast.prediction = function () {
-      return Session.get("weather");
-    };
+```js
+// in client/myapp.js: reactive helper function
+Template.forecast.helpers({
+  prediction: function () {
+    return Session.get("weather");
+  }
+});
+```
 
-    // in the JavaScript console
-    > Session.set("weather", "cloudy");
-    > document.body.innerHTML
-     => "<h1>Today's weather!</h1> <div>It'll be cloudy tonight</div>"
+```js
+// in the JavaScript console
+> Session.set("weather", "cloudy");
+> document.body.innerHTML
+ => "<h1>Today's weather!</h1> <div>It'll be cloudy tonight</div>"
 
-    > Session.set("weather", "cool and dry");
-    > document.body.innerHTML
-     => "<h1>Today's weather!</h1> <div>It'll be cool and dry tonight</div>"
+> Session.set("weather", "cool and dry");
+> document.body.innerHTML
+ => "<h1>Today's weather!</h1> <div>It'll be cool and dry tonight</div>"
+```
+
 
 
 Per leggere i dati di un array o di un cursore di database si usa
 `{{dstache}}#each}}`:
 
-    <!-- in myapp.html -->
-    <template name="players">
-      {{dstache}}#each topScorers}}
-        <div>{{dstache}}name}}</div>
-      {{dstache}}/each}}
-    {{lt}}/template>
+```html
+<!-- in myapp.html -->
+<template name="players">
+  {{dstache}}#each topScorers}}
+    <div>{{dstache}}name}}</div>
+  {{dstache}}/each}}
+{{lt}}/template>
+```
 
-    // in myapp.js
-    Template.players.topScorers = function () {
-      return Users.find({score: {$gt: 100}}, {sort: {score: -1}});
-    };
+```js
+// in myapp.js
+Template.players.helpers({
+  topScorers: function () {
+    return Users.find({score: {$gt: 100}}, {sort: {score: -1}});
+  }
+});
+```
 
 In questo caso i dati provengono da una query al database. Quando il
 cursore del database viene passato ad `{{dstache}}#each}}`, vengono eseguite
@@ -523,53 +647,67 @@ template di riferimento tramite `this`. Si noti che alcuni helper che
 definiscono dei blocchi cambiano il contesto dati in uso (in particolare
 `{{dstache}}#each}}` e `{{dstache}}#with}}`): 
 
-    // in a JavaScript file
-    Template.players.leagueIs = function (league) {
-      return this.league === league;
-    };
+```js
+// in a JavaScript file
+Template.players.helpers({
+  leagueIs: function (league) {
+    return this.league === league;
+  }
+});
+```
 
-    <!-- in a HTML file -->
-    <template name="players">
-      {{dstache}}#each topScorers}}
-        {{dstache}}#if leagueIs "junior"}}
-          <div>Junior: {{dstache}}name}}</div>
-        {{dstache}}/if}}
-        {{dstache}}#if leagueIs "senior"}}
-          <div>Senior: {{dstache}}name}}</div>
-        {{dstache}}/if}}
-      {{dstache}}/each}}
-    {{lt}}/template>
+```html
+<!-- in a HTML file -->
+<template name="players">
+  {{dstache}}#each topScorers}}
+    {{dstache}}#if leagueIs "junior"}}
+      <div>Junior: {{dstache}}name}}</div>
+    {{dstache}}/if}}
+    {{dstache}}#if leagueIs "senior"}}
+      <div>Senior: {{dstache}}name}}</div>
+    {{dstache}}/if}}
+  {{dstache}}/each}}
+{{lt}}/template>
+```
 
 Gli helper possono essere usati anche per passare costanti.
 
-    // Works fine with {{dstache}}#each sections}}
-    Template.report.sections = ["Situation", "Complication", "Resolution"];
+```js
+// Works fine with {{dstache}}#each sections}}
+Template.report.helpers({
+  sections: ["Situation", "Complication", "Resolution"]
+});
+```
 
-Infine si può usare la dichiarazione `events` nella funzione di un
-template per definire una tabella di gestori eventi. Il formato è
-documentato in [Event Maps](#eventmaps). L'argomento `this` per il
-gestore eventi sarà il contesto dati dell'elemento che ha scatenato
+Infine si può usare la funzione `events` di un
+template per definire i gestori eventi. Il formato è
+documentato in [Event Maps](#eventmaps). Il valore di `this` per il
+gestore evento sarà il contesto dati dell'elemento che ha scatenato
 l'evento.
 
-    <!-- myapp.html -->
-    <template name="scores">
-      {{dstache}}#each player}}
-        {{dstache}}> playerScore}}
-      {{dstache}}/each}}
-    {{lt}}/template>
+```html
+<!-- myapp.html -->
+<template name="scores">
+  {{dstache}}#each player}}
+    {{dstache}}> playerScore}}
+  {{dstache}}/each}}
+{{lt}}/template>
 
-    <template name="playerScore">
-      <div>{{dstache}}name}}: {{dstache}}score}}
-        <span class="givePoints">Give points</span>
-      </div>
-    {{lt}}/template>
+<template name="playerScore">
+  <div>{{dstache}}name}}: {{dstache}}score}}
+    <span class="give-points">Give points</span>
+  </div>
+{{lt}}/template>
+```
 
-    <!-- myapp.js -->
-    Template.playerScore.events({
-      'click .givePoints': function () {
-        Users.update(this._id, {$inc: {score: 2}});
-      }
-    });
+```js
+// myapp.js
+Template.playerScore.events({
+  'click .give-points': function () {
+    Users.update(this._id, {$inc: {score: 2}});
+  }
+});
+```
 
 Per ulteriori dettagli su Spacebars si legga
 [il README di Spacebars](https://github.com/meteor/meteor/blob/devel/packages/spacebars/README.md).
@@ -584,37 +722,43 @@ Per ulteriori dettagli su Spacebars si legga
 
 Tutte le caratteristiche che abbiamo visto finora sono implementate
 utilizzando i package standard di Meteor. Ciò è possibile grazie allo
-straordinario sistema di costruzione e gestione dei package in Meteor.
-I package funzionano indifferentemente sul server e nel browser, e
-possono contenere plugin che estendono gli strumenti disponibili per lo sviluppo, come ad esempio `coffeescript`
-([CoffeeScript](http://coffeescript.org) compilation) oppure `templating`
-(per la compilazione di template HTML).
+straordinario sistema isomorfico di gestione dei package e costruzione
+dell'applicazione in Meteor.
+Isomorfico significa che i package funzionano indifferentemente nel browser, in una app mobile
+e sul server. Essi possono contenere plugin che estendono gli strumenti disponibili per lo sviluppo,
+come ad esempio `coffeescript` ([CoffeeScript](http://coffeescript.org) compilation) oppure
+`templating` (per la compilazione di template HTML).
 
-Per visualizzare la lista dei package disponibili si usa
-[`meteor list`](#meteorlist), per aggiungere package al progetto
-[`meteor add`](#meteoradd) e per rimuoverli
-[`meteor remove`](#meteorremove).
+Anyone can publish a Meteor package, and thousands of community-written packages
+have been published to date. The easiest way to browse these packages is
+<a href="http://www.atmospherejs.com">Atmosphere</a>, by Percolate Studio.
+You can also use the [`meteor search`](#meteorsearch) and
+[`meteor show`](#meteorshow) commands.
 
-Per impostazione predefinita tutte le applicazioni includono il package
-`standard-app-packages`. Questo package include a sua volta tutti i package
-che compongono il nucleo di base di Meteor. Per semplicità questi package
-non sono inclusi nell'elenco prodotto da `meteor list`, ma è possibile
-leggere il [codice sorgente di `standard-app-packages`](https://github.com/meteor/meteor/blob/master/packages/standard-app-packages/package.js)
-per vedere quali sono (si ricordi che poichè Meteor è in pre-1.0 possono
-ancora subire modifiche). Se si desidera costruire un nucleo di base
-personalizzato, basta rimuovere `standard-app-packages` dall'applicazione
-ed aggiungere singolarmente i package standard che vogliamo usare.
+You can add packages to your project with [`meteor add`](#meteoradd) and remove
+them with [`meteor remove`](#meteorremove).
+Additionally, [`meteor list`](#meteorlist) will tell you what
+packages your project is using, and [`meteor update`](#meteorupdate)
+will update them to the newest versions when possible.
 
-Oltre a mostrare i package ufficiali della versione di Meteor in uso,
-`meteor list` e `meteor add` cercano anche nella cartella `packages`
-nella radice della nostra applicazione. I package non ufficiali scaricati
-da Atmosphere andrebbero installati in questa cartella
-(l'utility [Meteorite](http://oortcloud.github.io/meteorite/) semplifica
-questa operazione). Si può anche usare la cartella `packages` per
-suddividere l'applicazione in subpackage per comodità &mdash; se si è
-sufficientemente coraggiosi da non temere che il formato dei package
-cambierà in maniera significativa prima di Meteor 1.0 e che non è ancora ufficialmente documentato. Si veda
-[Scrittura di packages](#scritturadipackages).
+By default all apps include the `meteor-platform` package. This
+automatically pulls in the packages that make up the core Meteor
+stack. If you want to build your own custom stack, just remove
+`meteor-platform` from your app and add back in whichever of the standard
+packages you want to keep.
+
+Meteor uses a single-loading packaging system, meaning that it loads just one
+version of every package. Before adding or upgrading to a particular version of
+a package, Meteor uses a constraint solver to check if doing so will cause
+other packages to break. By default, Meteor will choose conservatively. When
+adding transitive dependencies (packages that other packages, but not the
+application itself) depend on, Meteor will try to choose the earlier version.
+
+In addition to the packages in the official Meteor release being used by your
+app, `meteor list` and `meteor add` also search the `packages` directory at the
+top of your app. You can also use the `packages` directory to break your app
+into subpackages for your convenience, or to test packages that you might want
+to publish. See [Writing Packages](#writingpackages).
 
 {{/markdown}}
 </template>
@@ -756,41 +900,35 @@ E' sufficiente configurare lo CNAME del dominio in maniera che punti a
 
 Forniamo questo servizio gratuitamente, in modo da poter provare Meteor.
 E' anche molto utile per mettere rapidamente online una beta ad uso interno,
-una demo, e così via.
+una demo, e così via. Si veda [meteor deploy](#meteordeploy) per ulteriori
+informazioni.
 
 <h3 class="nosection">Usare una infrastruttura proprietaria</h3>
 
 Si può installare l'applicazione anche utilizzando una infrastruttura
-proprietaria oppure usando un fornitore come Heroku.
+proprietaria oppure usando un qualunque fornitore in grado di far girare
+applicazioni node.js.
 
 Per iniziare eseguiamo
 
-    $ meteor bundle myapp.tgz
+    $ meteor build my_directory
 
 Questo comando genererà un'intera applicazione basata su Node.js contenuta
 in una [tarball](http://it.wikipedia.org/wiki/Tar_(software)). Per lanciare
 l'applicazione deve essere disponibile Node.js versione 0.10 ed un server MongoDB. (L'attuale versione di Meteor è stata
-testata con Node 0.10.25; le versioni precedenti contengono un bug che
+testata con Node 0.10.29; le versioni precedenti contengono un bug che
 potrebbe impallare i server in produzione). A questo punto si può lanciare
 l'applicazione eseguendo node, specificando la porta HTTP che l'applicazione
-deve ascoltare e l'istanza di MongoDB. Se non si dispone già di un server
-MongoDB raccomandiamo di dare un'occhiata ai nostri amici di
-[MongoHQ](http://mongohq.com).
+deve ascoltare e l'istanza di MongoDB.
 
-    $ PORT=3000 MONGO_URL=mongodb://localhost:27017/myapp node bundle/main.js
+```bash
+$ cd my_directory
+$ (cd programs/server && npm install)
+$ PORT=3000 MONGO_URL=mongodb://localhost:27017/myapp node main.js
+```g
 
 Altri package potrebbero necessitare di altre variabili di ambiente (ad
 esempio il package `email` ha bisogno di una variabile di ambiente `MAIL_URL`).
-
-{{#warning}}
-Attualmente un bundle funziona solo in un ambiente uguale a quello in cui
-è stato creato. Per girare in un diverso ambiente è necessario ricostruire
-i package nativi inclusi nel bundle. Per farlo dobbiamo disporre di `npm` ed eseguire:
-
-    $ cd bundle/programs/server/node_modules
-    $ rm -r fibers
-    $ npm install fibers@1.0.1
-{{/warning}}
 
 {{/markdown}}
 </template>
@@ -801,110 +939,67 @@ i package nativi inclusi nel bundle. Per farlo dobbiamo disporre di `npm` ed ese
 
   <h2 id="scritturadipackage">Scrittura di package</h2>
 
-Il formato dei package non è documentato ufficialmente e cambierà prima
-del rilascio di Meteor 1.0. Questo però non ha impedito agli sviuppatori
-come te di creare centinaia di package leggendo il codice sorgente dei
-package esistenti e seguendone l'esempio. Quindi se decidete di scrivere
-un package dovrete lavorare un po' da detective, ma in ogni caso ecco
-alcuni rapidi suggerimenti:
+Writing Meteor packages is easy. To initialize a meteor package, run
+`meteor create --package username:packagename`, where `username` is your Meteor
+Developer username. This will create a package from scratch and prefill the
+directory with a package.js control file and some javascript. By default, Meteor
+will take the package name from the name of the directory that contains the
+package.js file.
 
-* Un package è semplicemente una cartella contenente un file `package.js`.
-  Si può guardare la
-  [cartella `packages` nel codice sorgente di Meteor](https://github.com/meteor/meteor/tree/master/packages/)
-  per esempi di file `package.js`. Il nome ed il formato del file `package.js`
-  cambierà in maniera significativa prima di Meteor 1.0, ma la funzionalità
-  rimarrà in larga parte invariata, anche con una sintassi diversa, e dunque
-  sarà semplice convertire il codice.
+Meteor promises repeatable builds for both packages and applications. This means
+that, if you built your package on a machine, then checked the code into a
+repository and checked it out elsewhere, you should get the same result. In your
+package directory, you will find an automatically generated versions.json
+file. This file specifies the versions of all packages used to build your
+package and is part of the source. Check it into version control to ensure
+repeatable builds across machines.
 
-* I package elencano in maniera esplicita i file che compongono il loro codice
-  sorgente usando `api.add_files`, i file vengono caricati esattamente
-  nell'ordine specificato. (E' diverso da ciò che accade nelle applicazioni,
-  dove Meteor controlla l'albero delle cartelle per cercare i file
-  sorgenti). Non bisogna dimenticare di includere eventuali package che sono
-  plugin di compilazione (come `coffescript` oppure `templating` se si usano
-  i template HTML).
+{{#note}}
 
-* Per rendere visibili gli oggetti (export) all'esterno del package (si veda
-  [Namespacing](#namespacing)) bisogna invocare `api.export` dall'interno
-  del gestore `on_use`.
+Sometimes, packages do not just stand on their own, but function in the context
+of an app (specifically, packages in the packages directory of an app). In that
+case, the app's context will take precedence. Rather than using the
+versions.json file as a guide, we will build the package with the same
+dependencies as used by the app (we think that, in practice, it would be
+confusing to find your local packages built with different versions of
+things). However, we will still write the new versions.json file.
 
-* Un chiarimento su un aspetto oscuro delle exports: non sono
-  [lvalues](http://it.wikipedia.org/wiki/Valore_(informatica). Non si può
-  cioè assegnare un valore arbitrario ad una variabile esportata dopo averla
-  esportata. Se si esporta `a = {name: 'alice'}` possiamo cambiare il valore
-  di `a.name` quando vogliamo, ma se dopo l'avvio assegnamo ad `a` un oggetto
-  nuovo i package che importano `a` non vedranno la modifica. Poichè le export
-  sono quasi sempre oggetti o funzioni, difficilmente potrà mai essere un
-  problema.
+{{/note}}
 
-* I package possono usare i [moduli npm](https://npmjs.org/). Si utilizza
-  `Npm.depends` in `package.js` per elencare i moduli npm necessari e le
-  versioni specifiche che si desidera utilizzare. Poi si usa `Npm.require`
-  nel codice del package per scaricare i moduli al momento del bisogno.
-  Meteor si preoccupa di far in modo che tutti i componenti del team
-  di sviluppo eseguano lo stesso codice e dunque occorre poter
-  ricompilare l'applicazione in maniera 100% ripetibile, ed è per questo
-  che bisogna indicare le versioni dei moduli npm da cui dipende il codice.
-  Dietro le quinte, Meteor usa `npm shrinkwrap` per bloccare anche le
-  versioni delle dipendenze indirette di tutti i moduli npm in uso.
+Meteor uses extended semver versioning for its packages: that means that the version
+number has three parts separated by dots: major version, minor version and patch version
+(for example: 1.2.3) with an optional pre-release version. You can read more about it on
+[semver.org](http://www.semver.org).
+Additionally, because some meteor packages wrap external libraries,
+Meteor supports the convention of using `_` to denote a wrap number.
 
-* Quando modifichiamo un package, Meteor lo ricostruisce (compilando il
-  codice non-JavaScript, recuperando le dipendeze npm, inserendo il codice
-  per incapsulare il namespace e così via). Il package costruito viene
-  memorizzaro in una cache e ricostruito solo quando modifichiamo un file
-  sorgente (controllato con uno SHA1) oppure quando altre dipendenze,
-  come ad esempio i plugin di sviluppo, cambiano. Per forzare una
-  ricostruzione si può usare il comando non documentato `meteor rebuild-all`
-  anche se non dovrebbe mai essere necessario (se invece lo fosse vi
-  preghiamo di segnalarcelo con un [bug report](https://github.com/meteor/meteor/blob/devel/Contributing.md#filing-bug-reports)!).
+You can read more about [`package.js`](#packagejs) files in the API
+section.
 
-* I plugin di sviluppo e compilazione sono scritti utilizzando
-  `_transitional_registerBuildPlugin`, una API ancora fortemente in
-  divenire. Si veda il package `coffescript` come esempio. I plugin
-  di compilazione sono in tutto e per tutto eseguibili Meteor autonomi
-  e con un proprio namespace, dipendenze da altri package, file sorgenti
-  a utilizzo di moduli npm. La vecchia API `register_extension` non è
-  più disponibile.
+A word on testing: since testing is an important part of the development process,
+there are two common ways to test a package:
 
-* Si possono creare dipendenze di tipo "debole" o "opzionale" tra package.
-  Se il package A ha una dipendenza debole dal package B significa che
-  l'inclusione di A nell'applicazione non forzerà automaticamente
-  l'inclusione di B &mdash; ma se B _viene_ esplicitamente inclusa dallo
-  sviluppatore o da un altro package, allora B sarà caricata prima di A.
-  Si può usare questo meccanismo per creare package che si integrano o
-  migliorano le funzionalità di altri package solo se sono presenti.
-  Per creare una dipendenza debole bisogna passare `{weak: true}` come
-  terzo parametro di `api.use`. Quando si ha una dipendenza debole da un
-  package non sono visibili le sue export. Si può controllare la possibile
-  presenza di un package "da cui dipendiamo debolmente“ controllando se
-  `Package.foo` esiste, e sempre da li accedere alle sue export.
+* Integration tests (putting a package directly into an application, and writing
+tests against the application) is the most common way to test a package. After
+creating your package, add it to your app's /packages directory and run `meteor
+add`. This will add your package to your app as a local package. You can then
+test and run your app as usual. Meteor will detect and respond to changes to
+your local package, just as it does to your app files.
 
-* E' anche possibile creare dipendenze "non ordinate" passando
-  `{unordered: true}`. Una dipendenza non ordinata è l'esatto opposto
-  di una dipendenza debole. Se A dipende in maniera non ordinata da B
-  allora l'inclusione di A forza l'inclusione di B, ma non obbliga B
-  ad essere caricata prima di A. A volte può essere utile per risolvere
-  dipendenze circolari.
+* Unit tests are run with the command [`meteor test-packages
+package-name`](#meteortestpackages). As described in the [`package.js`](#packagejs)
+section, you can use the `package.js` file to specify where your unit tests are
+located. If you have a repository that contains only the package source, you can
+test your package by specifying the path to the package directory (which must
+contain a slash), such as `meteor test-packages ./`.
 
-* Meteor supporta anche le dipendenze implicite nei package. Se il package
-  A dipende implicitamente dal package B, allora quando qualcuno dipende
-  dal package A è come se dipendesse anche (implicitamente) da B.
-  Significa in particolare che ha accesso alle export di B. Per realizzare
-  una dipendenza implicita si usa `api.imply` e la si può usare per creare
-  package ombrello come `standard-app-package` che sono una scorciatoia per
-  includere un set di package, oppure un modo per raggruppare in un solo
-  package codice presente in diversi package ma con la stessa funzione come
-  per `accounts-base`.
-
-* Quando Meteor costruisce l'applicazione è consapevole del fatto che ciò
-  che è scritto in codice nativo per una architettura non può funzionare su
-  architetture diverse, e per questo possiede un sistema di nomi di
-  architetture per essere sicuro che un package scritto per una determinata
-  architettura non si cerchi di farlo funzionare su un'altra. Ad esempio se
-  includiamo un modulo npm che ha una estensione nativa, il package costruito
-  da Meteor sarà specifico per l'hardware della nostra macchina, ma se non
-  ha estensioni native il package creato da Meteor sarà portabile su altre
-  architetture.
+To publish a package, run [`meteor publish`](#meteorpublish) from the package
+directory.  There are some extra restrictions on published packages: they must
+contain a version (Meteor packages are versioned using
+strict <a href="http://www.semver.org">semver</a> versioning) and their names
+must be prefixed with the username of the author and a colon, like so:
+`iron:router`. This namespacing allows for more descriptive and on-topic package
+names.
 
 {{/markdown}}
 </template>

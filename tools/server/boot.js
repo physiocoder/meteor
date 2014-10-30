@@ -5,8 +5,8 @@ var Future = require(path.join("fibers", "future"));
 var _ = require('underscore');
 var sourcemap_support = require('source-map-support');
 
-// This code is duplicated in tools/meteor.js.
-var MIN_NODE_VERSION = 'v0.10.25';
+// This code is duplicated in tools/main.js.
+var MIN_NODE_VERSION = 'v0.10.29';
 
 if (require('semver').lt(process.version, MIN_NODE_VERSION)) {
   process.stderr.write(
@@ -23,7 +23,7 @@ var configJson =
 
 // Set up environment
 __meteor_bootstrap__ = {
-  startup_hooks: [],
+  startupHooks: [],
   serverDir: serverDir,
   configJson: configJson };
 __meteor_runtime_config__ = { meteorRelease: configJson.meteorRelease };
@@ -57,7 +57,7 @@ _.each(serverJson.load, function (fileInfo) {
       parsedSourceMap.sourceRoot = path.join(
         fileInfo.sourceMapRoot, parsedSourceMap.sourceRoot || '');
     }
-    parsedSourceMaps[fileInfo.path] = parsedSourceMap;
+    parsedSourceMaps[path.resolve(__dirname, fileInfo.path)] = parsedSourceMap;
   }
 });
 
@@ -77,12 +77,23 @@ sourcemap_support.install({
   handleUncaughtExceptions: false
 });
 
+// Only enabled by default in development.
+if (process.env.ENABLE_METEOR_SHELL) {
+  require('./shell.js').listen();
+}
 
 Fiber(function () {
   _.each(serverJson.load, function (fileInfo) {
     var code = fs.readFileSync(path.resolve(serverDir, fileInfo.path));
 
     var Npm = {
+      /**
+       * @summary Require a package that was specified using
+       * `Npm.depends()`.
+       * @param  {String} name The name of the package to require.
+       * @locus Server
+       * @memberOf Npm
+       */
       require: function (name) {
         if (! fileInfo.node_modules) {
           return require(name);
@@ -151,12 +162,24 @@ Fiber(function () {
     // \n is necessary in case final line is a //-comment
     var wrapped = "(function(Npm, Assets){" + code + "\n})";
 
-    var func = require('vm').runInThisContext(wrapped, fileInfo.path, true);
+    // It is safer to use the absolute path when source map is present as
+    // different tooling, such as node-inspector, can get confused on relative
+    // urls.
+    var absoluteFilePath = path.resolve(__dirname, fileInfo.path);
+    var scriptPath =
+      parsedSourceMaps[absoluteFilePath] ? absoluteFilePath : fileInfo.path;
+    var func = require('vm').runInThisContext(wrapped, scriptPath, true);
     func.call(global, Npm, Assets); // Coffeescript
   });
 
-  // run the user startup hooks.
-  _.each(__meteor_bootstrap__.startup_hooks, function (x) { x(); });
+  // run the user startup hooks.  other calls to startup() during this can still
+  // add hooks to the end.
+  while (__meteor_bootstrap__.startupHooks.length) {
+    var hook = __meteor_bootstrap__.startupHooks.shift();
+    hook();
+  }
+  // Setting this to null tells Meteor.startup to call hooks immediately.
+  __meteor_bootstrap__.startupHooks = null;
 
   // find and run main()
   // XXX hack. we should know the package that contains main.
@@ -166,7 +189,7 @@ Fiber(function () {
     mains.push(main);
     globalMain = main;
   }
-  _.each(Package, function (p, n) {
+  typeof Package !== 'undefined' && _.each(Package, function (p, n) {
     if ('main' in p && p.main !== globalMain) {
       mains.push(p.main);
     }

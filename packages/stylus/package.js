@@ -1,5 +1,6 @@
 Package.describe({
-  summary: 'Expressive, dynamic, robust CSS'
+  summary: 'Expressive, dynamic, robust CSS',
+  version: "1.0.5"
 });
 
 Package._transitional_registerBuildPlugin({
@@ -8,7 +9,7 @@ Package._transitional_registerBuildPlugin({
   sources: [
     'plugin/compile-stylus.js'
   ],
-  npmDependencies: { stylus: "0.42.3", nib: "1.0.2" }
+  npmDependencies: { stylus: "0.46.3", nib: "1.0.2" }
 });
 
 Package.on_test(function (api) {

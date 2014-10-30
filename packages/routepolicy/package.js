@@ -1,6 +1,6 @@
 Package.describe({
   summary: "route policy declarations",
-  internal: true
+  version: '1.0.2'
 });
 
 Package.on_use(function (api) {

@@ -1,6 +1,7 @@
 var _ = require('underscore');
-var unipackage = require('./unipackage.js');
+var uniload = require('./uniload.js');
 var release = require('./release.js');
+var Console = require('./console.js').Console;
 
 // runLog is primarily used by the parts of the tool which run apps locally. It
 // writes to standard output (and standard error, if rawLogs is set), and allows
@@ -17,9 +18,8 @@ var release = require('./release.js');
 // anywhere that may overlap with use of runLog.
 
 
-var getLoggingPackage = _.once(function () {
-  var Log = unipackage.load({
-    library: release.current.library,
+var getLoggingPackage = function () {
+  var Log = uniload.load({
     packages: ['logging']
   }).logging.Log;
 
@@ -28,7 +28,7 @@ var getLoggingPackage = _.once(function () {
   Log.outputFormat = 'colored-text';
 
   return Log;
-});
+};
 
 var RunLog = function () {
   var self = this;
@@ -42,6 +42,7 @@ var RunLog = function () {
   // message, and the value will be the number of consecutive such
   // messages that have been logged with no other intervening messages
   self.consecutiveRestartMessages = null;
+  self.consecutiveClientRestartMessages = null;
 
   // If non-null, the last thing that was logged was a temporary
   // message (with a carriage return but no newline), and this is its
@@ -64,7 +65,12 @@ _.extend(RunLog.prototype, {
 
     if (self.consecutiveRestartMessages) {
       self.consecutiveRestartMessages = null;
-      process.stdout.write("\n");
+      Console.stdout.write("\n");
+    }
+
+    if (self.consecutiveClientRestartMessages) {
+      self.consecutiveClientRestartMessages = null;
+      Console.stdout.write("\n");
     }
 
     if (self.temporaryMessageLength) {
@@ -90,9 +96,9 @@ _.extend(RunLog.prototype, {
 
     self._clearSpecial();
     if (self.rawLogs)
-      process[isStderr ? "stderr" : "stdout"].write(line + "\n");
+      Console[isStderr ? "stderr" : "stdout"].write(line + "\n");
     else
-      process.stdout.write(Log.format(obj, { color: true }) + "\n");
+      Console.stdout.write(Log.format(obj, { color: true }) + "\n");
 
     // XXX deal with test server logging differently?!
   },
@@ -110,7 +116,7 @@ _.extend(RunLog.prototype, {
     self._record(obj);
 
     self._clearSpecial();
-    process.stdout.write(msg + "\n");
+    Console.stdout.write(msg + "\n");
   },
 
   // Write a message to the terminal that will get overwritten by the
@@ -156,6 +162,33 @@ _.extend(RunLog.prototype, {
     });
   },
 
+  logClientRestart: function () {
+    var self = this;
+
+    if (self.consecutiveClientRestartMessages) {
+      // replace old message in place. this assumes that the new restart message
+      // is not shorter than the old one.
+      process.stdout.write("\r");
+      self.messages.pop();
+      self.consecutiveClientRestartMessages ++;
+    } else {
+      self._clearSpecial();
+      self.consecutiveClientRestartMessages = 1;
+    }
+
+    var message = "=> Client modified -- refreshing";
+    if (self.consecutiveClientRestartMessages > 1)
+      message += " (x" + self.consecutiveClientRestartMessages + ")";
+    // no newline, so that we can overwrite it if we get another
+    // restart message right after this one
+    process.stdout.write(message);
+
+    self._record({
+      time: new Date,
+      message: message
+    });
+  },
+
   finish: function () {
     var self = this;
 
@@ -173,5 +206,12 @@ _.extend(RunLog.prototype, {
   }
 });
 
-// Export a singleton instance of RunLog.
-exports.runLog = new RunLog;
+// Create a singleton instance of RunLog. Expose its public methods on the
+// object you get with require('./run-log.js').
+var runLogInstance = new RunLog;
+_.each(
+  ['log', 'logTemporary', 'logRestart', 'logClientRestart', 'logAppOutput',
+   'setRawLogs', 'finish', 'clearLog', 'getLog'],
+  function (method) {
+    exports[method] = _.bind(runLogInstance[method], runLogInstance);
+  });

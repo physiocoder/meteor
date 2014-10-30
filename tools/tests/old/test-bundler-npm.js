@@ -7,11 +7,46 @@ var Future = require('fibers/future');
 var files = require('../../files.js');
 var bundler = require('../../bundler.js');
 var release = require('../../release.js');
+var project = require('../../project.js');
+var catalog = require('../../catalog.js');
+var buildmessage = require('../../buildmessage.js');
 var meteorNpm = require('../../meteor-npm.js');
 
 var lastTmpDir = null;
 var tmpDir = function () {
   return (lastTmpDir = files.mkdtemp());
+};
+
+var setAppDir = function (appDir) {
+  project.project.setRootDir(appDir);
+
+  var checkoutPackageDir = path.join(
+    files.getCurrentToolsDir(), 'packages');
+  var localPackageDirs = [tmpPackageDirContainer, checkoutPackageDir];
+
+  if (files.usesWarehouse()) {
+    throw Error("This old test doesn't support non-checkout");
+  }
+
+  doOrThrow(function () {
+    catalog.uniload.initialize({
+      localPackageDirs: [checkoutPackageDir]
+    });
+    catalog.complete.initialize({
+      localPackageDirs: localPackageDirs
+    });
+  });
+};
+
+var doOrThrow = function (f) {
+  var ret;
+  var messages = buildmessage.capture(function () {
+    ret = f();
+  });
+  if (messages.hasMessages()) {
+    throw Error(messages.formatMessages());
+  }
+  return ret;
 };
 
 ///
@@ -21,9 +56,9 @@ var tmpPackageDirContainer = tmpDir();
 var testPackageDir = path.join(tmpPackageDirContainer, 'test-package');
 
 var reloadPackages = function () {
-  // XXX XXX hack on top of hack to force a package reload
-  // #HandlePackageDirsDifferently
-  release._resetPackageDirs([ tmpPackageDirContainer ]);
+  doOrThrow(function () {
+    catalog.complete.refreshLocalPackages();
+  });
 };
 
 var updateTestPackage = function (npmDependencies) {
@@ -31,7 +66,7 @@ var updateTestPackage = function (npmDependencies) {
     fs.mkdirSync(testPackageDir);
 
   fs.writeFileSync(path.join(testPackageDir, 'package.js'),
-                   "Package.describe({summary: 'a package that uses npm modules'});\n"
+                   "Package.describe({version: '1.0.0'});\n"
                    + "\n"
                    + "Npm.depends(" + JSON.stringify(npmDependencies) + ");"
                    + "\n"
@@ -84,7 +119,7 @@ var _assertCorrectPackageNpmDir = function (deps) {
   var expected = JSON.stringify({
     dependencies: expectedMeteorNpmShrinkwrapDependencies}, null, /*indentation, the way npm does it*/2) + '\n';
 
-  assert.equal(actual, expected);
+  assert.equal(actual, expected, actual + " == " + expected);
 
   assert.equal(
     fs.readFileSync(path.join(testPackageDir, ".npm", "package", ".gitignore"), 'utf8'),
@@ -123,7 +158,7 @@ var _assertCorrectBundleNpmContents = function (bundleDir, deps) {
                      bundler._mainJsContents);
 
   var bundledPackageNodeModulesDir = path.join(
-    bundleDir, 'programs', 'server', 'npm', 'test-package', 'main', 'node_modules');
+    bundleDir, 'programs', 'server', 'npm', 'test-package', 'node_modules');
 
   // bundle actually has the npm modules
   _.each(deps, function (version, name) {
@@ -150,18 +185,18 @@ var looksInstalled = function (nodeModulesDir, name) {
 ///
 
 var runTest = function () {
+   // As preparation, we need to initialize the official catalog, which serves
+   // as our sql data store.
+   catalog.official.initialize();
+
   // XXX this is a huge nasty hack. see release.js,
   // #HandlePackageDirsDifferently
-  release._resetPackageDirs([ tmpPackageDirContainer ]);
-
   console.log("app that uses gcd - clean run");
   assert.doesNotThrow(function () {
     updateTestPackage({gcd: '0.0.0'});
     var tmpOutputDir = tmpDir();
     var result = bundler.bundle({
-      appDir: appWithPackageDir,
-      outputPath: tmpOutputDir,
-      nodeModulesMode: 'skip'
+      outputPath: tmpOutputDir
     });
     assert.strictEqual(result.errors, false, result.errors && result.errors[0]);
     _assertCorrectPackageNpmDir({gcd: '0.0.0'});
@@ -172,9 +207,7 @@ var runTest = function () {
   assert.doesNotThrow(function () {
     var tmpOutputDir = tmpDir();
     var result = bundler.bundle({
-      appDir: appWithPackageDir,
-      outputPath: tmpOutputDir,
-      nodeModulesMode: 'skip'
+      outputPath: tmpOutputDir
     });
     assert.strictEqual(result.errors, false, result.errors && result.errors[0]);
     _assertCorrectPackageNpmDir({gcd: '0.0.0'});
@@ -192,7 +225,7 @@ var runTest = function () {
     // We also have to delete the .build directory or else we won't rebuild at
     // all.
     // XXX this seems wrong!
-    files.rm_recursive(path.join(testPackageDir, ".build"));
+    files.rm_recursive(path.join(testPackageDir, ".build.test-package"));
     assert(!fs.existsSync(path.join(nodeModulesDir)));
     reloadPackages();
 
@@ -203,14 +236,12 @@ var runTest = function () {
     // just remove all of the .npm directory)
     var bareExecFileSync = meteorNpm._execFileSync;
     meteorNpm._execFileSync = function (file, args, opts) {
-      if (args.length > 2 && args[0] === 'install' && args[1] === '--force')
+      if (args.length > 1 && args[0] === 'install')
         assert.fail("shouldn't be installing specific npm packages: " + args[1]);
       return bareExecFileSync(file, args, opts);
     };
     var result = bundler.bundle({
-      appDir: appWithPackageDir,
-      outputPath: tmpOutputDir,
-      nodeModulesMode: 'skip'
+      outputPath: tmpOutputDir
     });
     meteorNpm._execFileSync = bareExecFileSync;
 
@@ -219,15 +250,12 @@ var runTest = function () {
     _assertCorrectBundleNpmContents(tmpOutputDir, {gcd: '0.0.0'});
   });
 
-
   console.log("app that uses gcd - add mime and semver");
   assert.doesNotThrow(function () {
     updateTestPackage({gcd: '0.0.0', mime: '1.2.7', semver: '1.1.0'});
     var tmpOutputDir = tmpDir();
     var result = bundler.bundle({
-      appDir: appWithPackageDir,
-      outputPath: tmpOutputDir,
-      nodeModulesMode: 'skip'
+      outputPath: tmpOutputDir
     });
     assert.strictEqual(result.errors, false, result.errors && result.errors[0]);
     _assertCorrectPackageNpmDir({gcd: '0.0.0', mime: '1.2.7', semver: '1.1.0'});
@@ -245,14 +273,12 @@ var runTest = function () {
     // We also have to delete the .build directory or else we won't rebuild at
     // all.
     // XXX this seems wrong!
-    files.rm_recursive(path.join(testPackageDir, ".build"));
+    files.rm_recursive(path.join(testPackageDir, ".build.test-package"));
     assert(!fs.existsSync(path.join(nodeModulesMimeDir)));
 
     reloadPackages();
     var result = bundler.bundle({
-      appDir: appWithPackageDir,
-      outputPath: tmpOutputDir,
-      nodeModulesMode: 'skip'
+      outputPath: tmpOutputDir
     });
     assert.strictEqual(result.errors, false, result.errors && result.errors[0]);
     _assertCorrectPackageNpmDir({gcd: '0.0.0', mime: '1.2.7', semver: '1.1.0'});
@@ -264,9 +290,7 @@ var runTest = function () {
     updateTestPackage({gcd: '0.0.0', mime: '1.2.8'});
     var tmpOutputDir = tmpDir();
     var result = bundler.bundle({
-      appDir: appWithPackageDir,
-      outputPath: tmpOutputDir,
-      nodeModulesMode: 'skip'
+      outputPath: tmpOutputDir
     });
     assert.strictEqual(result.errors, false, result.errors && result.errors[0]);
     _assertCorrectPackageNpmDir({gcd: '0.0.0', mime: '1.2.8'});
@@ -278,9 +302,7 @@ var runTest = function () {
     updateTestPackage({gcd: '0.0.0', mime: '0.1.2'});
     var tmpOutputDir = tmpDir();
     var result = bundler.bundle({
-      appDir: appWithPackageDir,
-      outputPath: tmpOutputDir,
-      nodeModulesMode: 'skip'
+      outputPath: tmpOutputDir
     });
     assert(result.errors);
     var job = _.find(result.errors.jobs, function (job) {
@@ -296,9 +318,7 @@ var runTest = function () {
     updateTestPackage({gcd: '0.0.0', mime: '1.2.7'});
     var tmpOutputDir = tmpDir();
     var result = bundler.bundle({
-      appDir: appWithPackageDir,
-      outputPath: tmpOutputDir,
-      nodeModulesMode: 'skip'
+      outputPath: tmpOutputDir
     });
     assert.strictEqual(result.errors, false, result.errors && result.errors[0]);
 
@@ -306,16 +326,13 @@ var runTest = function () {
     _assertCorrectBundleNpmContents(tmpOutputDir, {gcd: '0.0.0', mime: '1.2.7'});
   });
 
-
   console.log("app that uses gcd - install gzippo via tarball");
   assert.doesNotThrow(function () {
     var deps = {gzippo: 'https://github.com/meteor/gzippo/tarball/1e4b955439abc643879ae264b28a761521818f3b'};
     updateTestPackage(deps);
     var tmpOutputDir = tmpDir();
     var result = bundler.bundle({
-      appDir: appWithPackageDir,
-      outputPath: tmpOutputDir,
-      nodeModulesMode: 'skip'
+      outputPath: tmpOutputDir
     });
     assert.strictEqual(result.errors, false, result.errors && result.errors[0]);
     _assertCorrectPackageNpmDir(deps);
@@ -346,6 +363,10 @@ var runTest = function () {
       Fiber(function () {
         var tmpAppDir = tmpDir();
         files.cp_r(appWithPackageDir, tmpAppDir);
+        fs.writeFileSync(
+          path.join(tmpAppDir, '.meteor', 'release'),
+          release.current.isProperRelease()
+            ? release.current.name : 'none');
 
         var tmpDirToPutBundleTarball = tmpDir();
 
@@ -355,16 +376,19 @@ var runTest = function () {
           var env = _.clone(process.env);
           env.PACKAGE_DIRS = tmpPackageDirContainer;
 
+          // XXX: Calling this causes an SQLITE_BUSY error!
           var result = meteorNpm._execFileSync(
             process.env.METEOR_TOOL_PATH,
             ["bundle", path.join(tmpDirToPutBundleTarball, "bundle.tar.gz")],
             {cwd: tmpAppDir, env: env});
+
           files.rm_recursive(tmpDirToPutBundleTarball);
         } catch (e) {
           console.log(e.stdout);
           console.log(e.stderr);
           throw e;
         }
+        assert(result.success, result.stderr);
         _assertCorrectPackageNpmDir({gcd: '0.0.0', mime: '1.2.7'});
 
         files.rm_recursive(tmpAppDir);
@@ -376,12 +400,12 @@ var runTest = function () {
     Future.wait(futures);
   });
 
-  release._resetPackageDirs();
 };
 
 
 var Fiber = require('fibers');
 Fiber(function () {
+  setAppDir(appWithPackageDir);
   release._setCurrentForOldTest();
   meteorNpm._printNpmCalls = true;
 

@@ -1,6 +1,6 @@
 Package.describe({
   summary: "Common code for OAuth-based login services",
-  internal: true
+  version: "1.1.2"
 });
 
 Package.on_use(function (api) {
@@ -11,7 +11,7 @@ Package.on_use(function (api) {
   api.use('accounts-base', ['client', 'server']);
   // Export Accounts (etc) to packages using this one.
   api.imply('accounts-base', ['client', 'server']);
-  api.use('oauth', 'server');
+  api.use('oauth');
 
   api.add_files('oauth_common.js');
   api.add_files('oauth_client.js', 'client');

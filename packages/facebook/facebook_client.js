@@ -15,25 +15,32 @@ Facebook.requestCredential = function (options, credentialRequestCompleteCallbac
 
   var config = ServiceConfiguration.configurations.findOne({service: 'facebook'});
   if (!config) {
-    credentialRequestCompleteCallback && credentialRequestCompleteCallback(new ServiceConfiguration.ConfigError("Service not configured"));
+    credentialRequestCompleteCallback && credentialRequestCompleteCallback(
+      new ServiceConfiguration.ConfigError());
     return;
   }
 
-  var credentialToken = Random.id();
-  var mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry/i.test(navigator.userAgent);
+  var credentialToken = Random.secret();
+  var mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|Windows Phone/i.test(navigator.userAgent);
   var display = mobile ? 'touch' : 'popup';
 
   var scope = "email";
   if (options && options.requestPermissions)
     scope = options.requestPermissions.join(',');
 
+  var loginStyle = OAuth._loginStyle('facebook', config, options);
+
   var loginUrl =
         'https://www.facebook.com/dialog/oauth?client_id=' + config.appId +
-        '&redirect_uri=' + Meteor.absoluteUrl('_oauth/facebook?close') +
-        '&display=' + display + '&scope=' + scope + '&state=' + credentialToken;
+        '&redirect_uri=' + OAuth._redirectUri('facebook', config) +
+        '&display=' + display + '&scope=' + scope +
+        '&state=' + OAuth._stateParam(loginStyle, credentialToken);
 
-  Oauth.showPopup(
-    loginUrl,
-    _.bind(credentialRequestCompleteCallback, null, credentialToken)
-  );
+  OAuth.launchLogin({
+    loginService: "facebook",
+    loginStyle: loginStyle,
+    loginUrl: loginUrl,
+    credentialRequestCompleteCallback: credentialRequestCompleteCallback,
+    credentialToken: credentialToken
+  });
 };

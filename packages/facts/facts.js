@@ -65,19 +65,21 @@ if (Meteor.isServer) {
     }, {is_auto: true});
   });
 } else {
-  Facts.server = new Meteor.Collection(serverFactsCollection);
+  Facts.server = new Mongo.Collection(serverFactsCollection);
 
-  Template.serverFacts.factsByPackage = function () {
-    return Facts.server.find();
-  };
-  Template.serverFacts.facts = function () {
-    var factArray = [];
-    _.each(this, function (value, name) {
-      if (name !== '_id')
-        factArray.push({name: name, value: value});
-    });
-    return factArray;
-  };
+  Template.serverFacts.helpers({
+    factsByPackage: function () {
+      return Facts.server.find();
+    },
+    facts: function () {
+      var factArray = [];
+      _.each(this, function (value, name) {
+        if (name !== '_id')
+          factArray.push({name: name, value: value});
+      });
+      return factArray;
+    }
+  });
 
   // Subscribe when the template is first made, and unsubscribe when it
   // is removed. If for some reason puts two copies of the template on
