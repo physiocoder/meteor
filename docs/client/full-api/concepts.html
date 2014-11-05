@@ -76,155 +76,155 @@ fonts...). Meteor automatizza la gestione e l'assemblaggio di questi
 componenti. Inoltre lascia un buon grado di libertà sull'organizzazione
 di file e cartelle che contengono questi componenti.
 
-### Special Directories
+### Cartelle Speciali
 
-By default, any JavaScript files in your Meteor folder are bundled and sent to
-the client and the server. However, the names of the files and directories
-inside your project can affect their load order, where they are loaded, and some
-other characteristics. Here is a list of file and directory names that are
-treated specially by Meteor:
+Di base tutti i file Javascript di una applicazione Meteor vengono messi insieme
+ed inviati sia al server che al client. Tuttavia i nomi di file e cartelle all'interno
+del progetto influenzano il loro ordine di caricamento, dove vengono caricati ed alcune
+altre caratteristiche. Questa è la lista dei nomi di file e cartelle che Meteor tratta
+in maniera speciale:
 
 - **client**
 
-    Any directory named `client` is not loaded on the server. Similar to
-    wrapping your code in `if (Meteor.isClient) { ... }`. All files loaded on
-    the client are automatically concatenated and minified when in production
-    mode. In development mode, each file is sent individually for easier
-    debugging.
+    Ogni cartella chiamata `client` non viene caricata sul server. Equivale ad inserire
+    il codice dentro un `if (Meteor.isClient) { ... }`. Tutti i files caricati sul client
+    vengono automaticamente concatenati e minificati in modalità di produzione.
+    In modalità sviluppo invece ogni file viene inviato individualmente per facilitare
+    il debugging.
 
-    HTML files in a Meteor application are treated quite a bit differently
-    from a server-side framework.  Meteor scans all the HTML files in your
-    directory for three top-level elements: `<head>`, `<body>`, and
-    `<template>`.  The head and body sections are separately concatenated
-    into a single head and body, which are transmitted to the client on
-    initial page load.
+    I files HTML in Meteor sono trattati in maniera un po' diversa da come farebbe un
+    framework server-side tradizionale. Meteor esegue lo scan di tutti i files HTML alla
+    ricerca di di tre elementi principali: `<head>`, `<body>`, e `<template>`.  Le
+    sezioni head ed i body vengono concatenati separatamente in un singolo head ed un
+    singolo body, e vengono trasmetti al client al caricamento iniziale della pagina.
 
 - **server**
 
-    Any directory named `server` is not loaded on the client. Similar to
-    wrapping your code in `if (Meteor.isServer) { ... }`, except the client
-    never even receives the code. Any sensitive code that you don't want served
-    to the client, such as code containing passwords or authentication
-    mechanisms, should be kept in the `server` directory.
+    Ogni cartella chiamata `server` non viene trasmessa al client. Equivale ad inserire
+    il codice dentro un `if (Meteor.isServer) { ... }`, tranne per il fatto che il client
+    non solo non esegue ma neanche riceve mai quel codice. Tutto il codice che non si
+    desidera mai mettere a conoscenza del client, come ad esempio codice contente
+    passwords o meccanismi di autenticazione, dovrebbe rimanere sempre e solo in una
+    cartella `server`.
 
-    Meteor gathers all your JavaScript files, excluding anything under the
-    `client`, `public`, and `private` subdirectories, and loads them into a
-    Node.js server instance.  In Meteor, your server code runs in a single
-    thread per request, not in the asynchronous callback style typical of Node.
-    We find the linear execution model a better fit for the typical server code
-    in a Meteor application.
-
+    Meteor raggruppa tutti i file Javascript, tranne quelli nelle sottocartelle `client`,
+    `public`, e `private` e li carica in una istanza di Node.js sul server. In Meteor il
+    codice server-side viene eseguito in un singolo thread per richiesta, e non nel
+    tipico stile di callback asincrone di Node. Il modello di esecuzione lineare è più
+    adatto al tipico codice server di una applicazione Meteor.
+    
 - **public**
 
-    All files inside a top-level directory called `public` are served as-is to
-    the client. When referencing these assets, do not include `public/` in the
-    URL, write the URL as if they were all in the top level. For example,
-    reference `public/bg.png` as `<img src='/bg.png' />`. This is the best place
-    for `favicon.ico`, `robots.txt`, and similar files.
+    Tutti i file nella cartella `public` messa nella root della nostra applicazione
+    vengono inviati così come sono al client. Quando nel codice facciamo riferimento a
+    questi files non bisogna includere `public/` nella URL, ma scriverla come se fossero
+    nella cartella principale dell'applicazione. Ad esempio per far riferimento a
+    `public/bg.png` dobbiamo scrivere `<img src='/bg.png' />`. E' la cartella adatta per
+    files come `favicon.ico`, `robots.txt` e simili.
 
 - **private**
 
-    All files inside a top-level directory called `private` are only accessible
-    from server code and can be loaded via the [`Assets`](#assets) API. This can
-    be used for private data files and any files that are in your project
-    directory that you don't want to be accessible from the outside.
+    Tutti i file nella cartella `private` messa nella root della nostra applicazione sono
+    accessibili solo dal codice server e possono essere caricati attraverso l'API
+    [`Assets`](#assets). Questa cartella è adatta per file di dati privati o qualsiasi
+    altro file del progetto che non si vuole rendere disponibile all'esterno.
 
 - **client/compatibility**
 
-    This folder is for compatibility JavaScript libraries that rely on variables
-    declared with var at the top level being exported as globals.  Files in this
-    directory are executed without being wrapped in a new variable scope.  These
-    files are executed before other client-side JavaScript fies.
+    In questa cartella mettiamo per compatibilità le librerie JavaScript che usano
+    variabili dichiarate con var e poi esportate come globali. I files in questa cartella
+    vengono eseguiti senza essere incapsulati in un ulteriore strato di visibilità delle
+    variabili. Questi files vengono eseguiti prima degli altri file JavaScript lato client.
 
 - **tests**
 
-    Any directory named `tests` is not loaded anywhere. Use this for any local
-    test code.
+    Ogni cartella chiamata `tests` non viene mai caricata nell'applicazione. Da usare per
+    il codice di test locale.
 
-### Files outside special directories
+### Files all'infuori delle cartelle speciali
 
-All JavaScript files outside special directories are loaded on both the client
-and the server.  That's the place for model definitions and other functions.
-Meteor provides the variables [`Meteor.isClient`](#meteor_isclient) and
-[`Meteor.isServer`](#meteor_isserver) so that your code can alter its behavior
-depending on whether it's running on the client or the server.
+Tutti i files che non stano in nessuna delle cartelle speciali di cui abbiamo parlato
+vengono caricati sia lato client che lato server. È qui che mettiamo la definizione
+della base dati (il model) e altre funzioni. In Meteor abbiamo le variabili
+[`Meteor.isClient`](#meteor_isclient) e [`Meteor.isServer`](#meteor_isserver) che ci
+permettono di eseguire azioni diverse a seconda che il codice stia girando sul server
+oppure sul client.
 
-CSS and HTML files outside special directories are loaded on the client only,
-and cannot be used from server code.
+I files CSS e HTML esterni alle cartelle speciali vengono caricati solo lato client e non
+possono essere utilizzati dal codice server.
 
-### Example File Structure
+### Esempio di Struttura dei Files
 
-The file structure of your Meteor app is very flexible. Here is an example layout that takes advantage of some of the special folders mentioned above.
+La struttura dei files di un'applicazione Meteor è molto flessibile. Ecco un esempio di
+struttura che utilizza le cartelle speciali di cui abbiamo parlato prima.
 
 ```bash
-lib/                      # common code like collections and utilities
-lib/methods.js            # Meteor.methods definitions
-lib/constants.js          # constants used in the rest of the code
+lib/                      # code comune client/server come collections e utilities
+lib/methods.js            # definizione dei Meteor.methods
+lib/constants.js          # costanti utilizzate in tutto il codice
 
-client/compatibility      # legacy libraries that expect to be global
-client/lib/               # code for the client to be loaded first
-client/lib/helpers.js     # useful helpers for your client code
-client/body.html          # content that goes in the <body> of your HTML
-client/head.html          # content for <head> of your HTML: <meta> tags, etc
-client/style.css          # some CSS code
-client/<feature>.html     # HTML templates related to a certain feature
-client/<feature>.js       # JavaScript code related to a certain feature
+client/compatibility      # librerie legacy che definiscono variabili gloabli
+client/lib/               # codice client side che verrà caricato per primo
+client/lib/helpers.js     # funzioni di utilità per il codice client
+client/body.html          # contenuto dell'elemento <body> dell'HTML
+client/head.html          # contenuto dell'elemento <head> dell'HTML: <meta> tags, etc
+client/style.css          # codice CSS
+client/<feature>.html     # templates HTML per una determinata funzione dell'app
+client/<feature>.js       # codice JavaScript per una determinata funzione dell'app
 
-server/lib/permissions.js # sensitive permissions code used by your server
-server/publications.js    # Meteor.publish definitions
+server/lib/permissions.js # codice privato per i permessi, usato dal server
+server/publications.js    # definizioni di Meteor.publish
 
-public/favicon.ico        # app icon
+public/favicon.ico        # icona dell'app
 
-settings.json             # configuration data to be passed to meteor --settings
-mobile-config.js          # define icons and metadata for Android/iOS
+settings.json             # dati di configurazione da passare a meteor --settings
+mobile-config.js          # definizione di icone e metadata per Android/iOS
 ```
 
-You can also model your directory structure after the example apps. Run `meteor
-create --example todos` and explore the directories to see where all the files
-in a real app could go.
+Un altro modo per definire la struttura delle cartelle è ispirarsi alle applicazioni di
+esempio. Eseguite `meteor create --example todos` ed esplorate le cartelle per vedere
+come possono essere organizzati i files in una applicazione reale.
 
-### File Load Order
+### Ordine di Caricamento dei Files
 
-It is best to write your application in such a way that it is insensitive to the
-order in which files are loaded, for example by using
-[Meteor.startup](#meteor_startup), or by moving load order sensitive code into
-[packages](#usingpackages), which can explicitly control both the load order of
-their contents and their load order with respect to other packages. However
-sometimes load order dependencies in your application are unavoidable.
+Il modo migliore per srivere un'applicazione è che sia indifferente all'ordine con cui
+vengono caricati i files, ad esempio usando [Meteor.startup](#meteor_startup), oppure
+spostando il codice dipendente da uno specifico ordine di caricamento in un
+[packages](#usingpackages), che può decidere esplicitamente sia l'ordine di caricamento
+del suo contenuto che l'ordine di caricamento rispetto agli altri packages. Ciò
+nonostante a volte non è possibile evitare la necessità di uno specifico ordine di
+caricamento.
 
-When not using special filenames and directories:
+Se non si usano cartelle o file con nomi speciali:
 
-- Files in subdirectories are loaded before files in parent directories, so that
-files in the deepest subdirectory are loaded first, and files in the root
-directory are loaded last. - Within a directory, files are loaded in
-alphabetical order by filename.
+- I files in una sottocartella sono caricati prima di quelli nella cartella padre, quindi
+i files nella directory più annidata sono caricati per primi mentre quelli nella cartella
+radice per ultimi. - All'interno di una cartella i file vengono caricati in ordine
+alfabetico.
 
-Below is a complete list of special file and directory names that control file
-load order:
+Questa invece è la lista di nomi speciali per files e cartelle che influenzano l'ordine
+di caricamento:
 
 - **lib**
 
-    After sorting as described above, all files under directories named `lib`
-    are moved before everything else, preserving their order.
+    Dopo essere stati ordinati come descritto sopra, tutti i files nelle cartelle
+    `lib` vengono messi prima di tutto il resto, preservando il loro ordine.
 
 - **main.***
 
-    All files that match `main.*` are moved after everything else, preserving
-    their order.
+    Tutti i files del tipo `main.*` vengono messi dopo tutti gli altri, preservando il
+    loro ordine.
 
+### Organizzare un Progetto
 
-
-### Organizing Your Project
-
-There are three main ways to organize your files into features or components.
-Let's say we have two types of objects in our project: **apples** and
+Ci sono tre metodi principali per organizzare i files suddividendoli per funzionalità o
+componenti. Supponiamo di avere due tipi di oggetti nel nostro progetto: **apples** e
 **oranges**.
 
-#### Method 1: Root-Level Folders
+#### Metodo 1: Cartelle nella radice
 
-Since the special `client`, `server`, and `lib` directories work if they are
-anywhere in the path, you can use top-level folders to organize code into
-modules:
+Poichè le cartelle speciali `client`, `server`, e `lib` funzionano ovunque si trovino,
+possiamo usare delle cartelle nella radice per organizzare il codice in moduli:
 
 ```bash
 apples/lib/               # code for apple-related features
@@ -236,34 +236,34 @@ oranges/client/
 oranges/server/
 ```
 
-#### Method 2: Folders inside client/ and server/
+#### Metodo 2: Cartelle all'interno di client/ e server/
 
 ```bash
-lib/apples/               # common code for apples
-lib/oranges/              # and oranges
+lib/apples/               # codice coomune per apples
+lib/oranges/              # e oranges
 
-client/apples/            # client code for apples
-client/oranges/           # and oranges
+client/apples/            # codice client per apples
+client/oranges/           # e oranges
 
-server/apples/            # server code for apples
-server/oranges/           # and oranges
+server/apples/            # codice server per apples
+server/oranges/           # e oranges
 ```
 
-#### Method 3: Packages
+#### Metodo 3: Packages
 
-This is the ultimate in code separation, modularity, and reusability. If you put
-the code for each feature in a separate package, the code for one feature won't
-be able to access the code for the other feature except through exports, making
-every dependency explicit. This also allows for the easiest independent testing
-of features. You can also publish the packages and use them in multiple apps
-with `meteor add`.
+È l'approccio che esprime al massimo la separazione del codice, la modularità e la
+riusabilità. Se si mette il codice di ogni parte di programma in un package separato,
+questo codice non potrà vedere il codice delle altre parti tranne che attraverso le
+exports, rendendo esplicita ogni dipendenza. È anche il modo più semplice per eseguire
+in maniera modulare il test del codice. Infine abbiamo la possibilità di pubblicare il
+package ed utilizzarlo in diverse app tramite `meteor add`.
 
 ```bash
-packages/apples/package.js     # files, dependencies, exports for apple feature
-packages/apples/<anything>.js  # file loading is controlled by package.js
+packages/apples/package.js     # files, dipendenze, exports della sezione apple
+packages/apples/<anything>.js  # il caricamento dei files è controllato da package.js
 
-packages/oranges/package.js    # files, dependencies, exports for orange feature
-packages/oranges/<anything>.js # file loading is controlled by package.js
+packages/oranges/package.js    # files, dipendenze, exports della sezione orange
+packages/oranges/<anything>.js # il caricamento dei files è controllato da package.js
 ```
 
 {{/markdown}}
@@ -915,17 +915,17 @@ Per iniziare eseguiamo
 
 Questo comando genererà un'intera applicazione basata su Node.js contenuta
 in una [tarball](http://it.wikipedia.org/wiki/Tar_(software)). Per lanciare
-l'applicazione deve essere disponibile Node.js versione 0.10 ed un server MongoDB. (L'attuale versione di Meteor è stata
-testata con Node 0.10.29; le versioni precedenti contengono un bug che
-potrebbe impallare i server in produzione). A questo punto si può lanciare
-l'applicazione eseguendo node, specificando la porta HTTP che l'applicazione
+l'applicazione deve essere disponibile Node.js versione 0.10 ed un server MongoDB.
+(L'attuale versione di Meteor è stata testata con Node 0.10.29; le versioni precedenti
+contengono un bug che potrebbe impallare i server in produzione). A questo punto si può
+lanciare l'applicazione eseguendo node, specificando la porta HTTP che l'applicazione
 deve ascoltare e l'istanza di MongoDB.
 
 ```bash
 $ cd my_directory
 $ (cd programs/server && npm install)
 $ PORT=3000 MONGO_URL=mongodb://localhost:27017/myapp node main.js
-```g
+```
 
 Altri package potrebbero necessitare di altre variabili di ambiente (ad
 esempio il package `email` ha bisogno di una variabile di ambiente `MAIL_URL`).
