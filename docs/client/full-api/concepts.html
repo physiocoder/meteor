@@ -70,7 +70,7 @@ l'ecosistema è stato costruito per supportare questo principio.
 <h2 id="strutturadiunapp">Struttura di una applicazione</h2>
 
 Una applicazione Meteor è un mix di JavaScript eseguito nel browser o in un'app PhoneGap,
-JavaScript eseguito dal server di Meteor in un'istanza di [Node.js](http://nodejs.org),
+JavaScript eseguito dal server di Meteor in un'istanza di [Node.js](http://nodejs.org)
 più tutto l'HTML di supporto, regole CSS e asset statici (immagini, icone,
 fonts...). Meteor automatizza la gestione e l'assemblaggio di questi
 componenti. Inoltre lascia un buon grado di libertà sull'organizzazione
@@ -78,10 +78,10 @@ di file e cartelle che contengono questi componenti.
 
 ### Cartelle Speciali
 
-Di base tutti i file Javascript di una applicazione Meteor vengono messi insieme
-ed inviati sia al server che al client. Tuttavia i nomi di file e cartelle all'interno
+Di base tutti i files Javascript di una applicazione Meteor vengono messi insieme
+ed inviati sia al server che al client. Tuttavia i nomi di files e cartelle all'interno
 del progetto influenzano il loro ordine di caricamento, dove vengono caricati ed alcune
-altre caratteristiche. Questa è la lista dei nomi di file e cartelle che Meteor tratta
+altre caratteristiche. Questa è la lista dei nomi di files e cartelle che Meteor tratta
 in maniera speciale:
 
 - **client**
@@ -112,7 +112,7 @@ in maniera speciale:
     codice server-side viene eseguito in un singolo thread per richiesta, e non nel
     tipico stile di callback asincrone di Node. Il modello di esecuzione lineare è più
     adatto al tipico codice server di una applicazione Meteor.
-    
+
 - **public**
 
     Tutti i file nella cartella `public` messa nella root della nostra applicazione
@@ -143,7 +143,7 @@ in maniera speciale:
 
 ### Files all'infuori delle cartelle speciali
 
-Tutti i files che non stano in nessuna delle cartelle speciali di cui abbiamo parlato
+Tutti i files che non stanno in nessuna delle cartelle speciali di cui abbiamo parlato
 vengono caricati sia lato client che lato server. È qui che mettiamo la definizione
 della base dati (il model) e altre funzioni. In Meteor abbiamo le variabili
 [`Meteor.isClient`](#meteor_isclient) e [`Meteor.isServer`](#meteor_isserver) che ci
@@ -159,7 +159,7 @@ La struttura dei files di un'applicazione Meteor è molto flessibile. Ecco un es
 struttura che utilizza le cartelle speciali di cui abbiamo parlato prima.
 
 ```bash
-lib/                      # code comune client/server come collections e utilities
+lib/                      # codice comune client/server come collections e utilities
 lib/methods.js            # definizione dei Meteor.methods
 lib/constants.js          # costanti utilizzate in tutto il codice
 
@@ -187,10 +187,10 @@ come possono essere organizzati i files in una applicazione reale.
 
 ### Ordine di Caricamento dei Files
 
-Il modo migliore per srivere un'applicazione è che sia indifferente all'ordine con cui
+Il modo migliore per scrivere un'applicazione è che sia indifferente all'ordine con cui
 vengono caricati i files, ad esempio usando [Meteor.startup](#meteor_startup), oppure
 spostando il codice dipendente da uno specifico ordine di caricamento in un
-[packages](#usingpackages), che può decidere esplicitamente sia l'ordine di caricamento
+[package](#usingpackages), che può decidere esplicitamente sia l'ordine di caricamento
 del suo contenuto che l'ordine di caricamento rispetto agli altri packages. Ciò
 nonostante a volte non è possibile evitare la necessità di uno specifico ordine di
 caricamento.
@@ -202,8 +202,7 @@ i files nella directory più annidata sono caricati per primi mentre quelli nell
 radice per ultimi. - All'interno di una cartella i file vengono caricati in ordine
 alfabetico.
 
-Questa invece è la lista di nomi speciali per files e cartelle che influenzano l'ordine
-di caricamento:
+Questa invece è la lista di nomi speciali che influenzano l'ordine di caricamento:
 
 - **lib**
 
@@ -214,6 +213,8 @@ di caricamento:
 
     Tutti i files del tipo `main.*` vengono messi dopo tutti gli altri, preservando il
     loro ordine.
+
+
 
 ### Organizzare un Progetto
 
@@ -227,11 +228,11 @@ Poichè le cartelle speciali `client`, `server`, e `lib` funzionano ovunque si t
 possiamo usare delle cartelle nella radice per organizzare il codice in moduli:
 
 ```bash
-apples/lib/               # code for apple-related features
+apples/lib/               # codice per la sezione relativa a apples
 apples/client/
 apples/server/
 
-oranges/lib/              # code for orange-related features
+oranges/lib/              # codice per la sezione relativa a oranges
 oranges/client/
 oranges/server/
 ```
@@ -251,7 +252,7 @@ server/oranges/           # e oranges
 
 #### Metodo 3: Packages
 
-È l'approccio che esprime al massimo la separazione del codice, la modularità e la
+È l'approccio che realizza al massimo la separazione del codice, la modularità e la
 riusabilità. Se si mette il codice di ogni parte di programma in un package separato,
 questo codice non potrà vedere il codice delle altre parti tranne che attraverso le
 exports, rendendo esplicita ogni dipendenza. È anche il modo più semplice per eseguire
@@ -259,10 +260,10 @@ in maniera modulare il test del codice. Infine abbiamo la possibilità di pubbli
 package ed utilizzarlo in diverse app tramite `meteor add`.
 
 ```bash
-packages/apples/package.js     # files, dipendenze, exports della sezione apple
+packages/apples/package.js     # files, dipendenze, exports della sezione apples
 packages/apples/<anything>.js  # il caricamento dei files è controllato da package.js
 
-packages/oranges/package.js    # files, dipendenze, exports della sezione orange
+packages/oranges/package.js    # files, dipendenze, exports della sezione oranges
 packages/oranges/<anything>.js # il caricamento dei files è controllato da package.js
 ```
 
