@@ -46,9 +46,7 @@ var getReleaseOrPackageRecord = function(name) {
   return { record: rec, isRelease: rel };
 };
 
-// Seriously, this dies if it can't refresh. Only call it if you're sure you're
-// OK that the command doesn't work while offline.
-var doOrDie = exports.doOrDie = function (options, f) {
+var doOrDie = function (options, f) {
   if (_.isFunction(options)) {
     f = options;
     options = {};
@@ -65,6 +63,8 @@ var doOrDie = exports.doOrDie = function (options, f) {
   return ret;
 };
 
+// Seriously, this dies if it can't refresh. Only call it if you're sure you're
+// OK that the command doesn't work while offline.
 var refreshOfficialCatalogOrDie = function (options) {
   if (!catalog.refreshOrWarn(options)) {
     Console.error(
@@ -393,9 +393,7 @@ main.registerCommand({
   // Refresh the catalog, cacheing the remote package data on the server.
   //refreshOfficialCatalogOrDie();
 
-  var packageInfo = doOrDie(function () {
-    return catalog.complete.getPackage(name);
-  });
+  var packageInfo = catalog.complete.getPackage(name);
   if (! packageInfo) {
     Console.error(
 "You can't call `meteor publish-for-arch` on package '" + name + "' without\n" +
@@ -806,7 +804,7 @@ main.registerCommand({
           var packageDir = path.resolve(path.join(localPackageDir, item));
           // Consider a directory to be a package source tree if it
           // contains 'package.js'. (We used to support isopacks in
-          // localPackageDirs, but no longer.)
+          // local package directories, but no longer.)
           if (fs.existsSync(path.join(packageDir, 'package.js'))) {
             var packageSource = new PackageSource(catalog.complete);
             buildmessage.enterJob(
@@ -1755,15 +1753,7 @@ var maybeUpdateRelease = function (options) {
   var solutionReleaseRecord = null;
   var solutionPackageVersions = null;
   var directDependencies = project.getConstraints();
-  var previousVersions;
-  var messages = buildmessage.capture(function () {
-    previousVersions = project.getVersions({dontRunConstraintSolver: true});
-  });
-  if (messages.hasMessages()) {
-    Console.printMessages(messages);
-    // We couldn't figure out our current versions, so updating is not going to work.
-    return 1;
-  }
+  var previousVersions = project.getVersions({dontRunConstraintSolver: true});
 
   var solutionReleaseVersion = _.find(releaseVersionsToTry, function (versionToTry) {
     var releaseRecord = catalog.official.getReleaseVersion(
@@ -1925,15 +1915,11 @@ main.registerCommand({
   // Let's figure out what packages we are currently using. Don't run the
   // constraint solver yet, we don't care about reconciling them, just want to
   // know what they are for some internal constraint solver heuristics.
-  var versions, allPackages;
-  messages = buildmessage.capture(function () {
-    versions = project.getVersions({dontRunConstraintSolver: true});
+  var versions = project.getVersions({dontRunConstraintSolver: true});
+  var allPackages;
+  doOrDie(function () {
     allPackages = project.calculateCombinedConstraints(releasePackages);
   });
-  if (messages.hasMessages()) {
-    Console.printMessages(messages);
-    return 1;
-  }
 
   // If no packages have been specified, then we will send in a request to
   // update all direct dependencies. If a specific list of packages has been
@@ -2095,28 +2081,33 @@ main.registerCommand({
 
   _.each(constraints, function (constraint) {
     // Check that the package exists.
-    doOrDie({title: 'Checking package: ' + constraint.name }, function () {
-      if (! catalog.complete.getPackage(constraint.name)) {
-        Console.error(constraint.name + ": no such package");
-        failed = true;
-        return;
-      }
-    });
+    if (! catalog.complete.getPackage(constraint.name)) {
+      Console.error(constraint.name + ": no such package");
+      failed = true;
+      return;
+    }
+
+    var thisConstraintFailed = false;
 
     // If the version was specified, check that the version exists.
     _.each(constraint.constraints, function (constr) {
       if (constr.version !== null) {
-        var versionInfo = doOrDie({ title: 'Fetching packages' }, function () {
-          return catalog.complete.getVersion(constraint.name, constr.version);
-        });
+        var versionInfo = catalog.complete.getVersion(
+          constraint.name, constr.version);
         if (! versionInfo) {
           Console.stderr.write(
             constraint.name + "@" + constr.version  + ": no such version\n");
-          failed = true;
+          thisConstraintFailed = true;
           return;
         }
       }
     });
+
+    if (thisConstraintFailed) {
+      failed = true;
+      return;
+    }
+
     // Check that the constraint is new. If we are already using the package at
     // the same constraint in the app, return from this function, but don't
     // fail. Rejecting the entire command because a part of it is a no-op is
@@ -2246,9 +2237,7 @@ main.registerCommand({
   Console.stdout.write("\n");
   _.each(constraints, function (constraint) {
     var version = newVersions[constraint.name];
-    var versionRecord = doOrDie(function () {
-      return catalog.complete.getVersion(constraint.name, version);
-    });
+    var versionRecord = catalog.complete.getVersion(constraint.name, version);
     Console.stdout.write(constraint.name +
                          (versionRecord.description ?
                           (": " + versionRecord.description) :

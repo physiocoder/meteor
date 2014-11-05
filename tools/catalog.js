@@ -143,11 +143,6 @@ _.extend(LayeredCatalog.prototype, {
     self.localCatalog.addLocalPackage(directory);
   },
 
-  getAllBuilds: function (name, version) {
-    var self = this;
-    return self._returnFirst("getAllBuilds", arguments, ACCEPT_NON_EMPTY);
-  },
-
   getLatestVersion: function (name) {
     var self = this;
     return self._returnFirst("getLatestVersion", arguments, ACCEPT_NON_EMPTY);
@@ -168,14 +163,6 @@ _.extend(LayeredCatalog.prototype, {
     return self.otherCatalog[f].apply(self.otherCatalog, splittedArgs);
   },
 
-  getBuildsForArches: function (name, version, arches) {
-    return this._returnFirst("getBuildsForArches", arguments, ACCEPT_NON_EMPTY);
-  },
-
-  getBuildWithPreciseBuildArchitectures: function (versionRecord, buildArchitectures) {
-    return this._returnFirst("getBuildWithPreciseBuildArchitectures", arguments, ACCEPT_NON_EMPTY);
-  },
-
   getForgottenECVs: function (packageName) {
     var self = this;
     var versions = self.otherCatalog.getSortedVersions(packageName);
@@ -187,13 +174,25 @@ _.extend(LayeredCatalog.prototype, {
     return forgottenECVs;
   },
 
+  // Doesn't download packages. Downloading should be done at the time
+  // that .meteor/versions is updated.
   getLoadPathForPackage: function (name, version, constraintSolverOpts) {
     var self = this;
-    return self.localCatalog.getLoadPathForPackage(name, version, constraintSolverOpts);
+    var loadPath = self.localCatalog.getLoadPathForPackage(
+      name, version, constraintSolverOpts);
+    if (loadPath)
+      return loadPath;
+
+    if (! version) {
+      throw new Error(name + " not a local package, and no version specified?");
+    }
+
+    return self.otherCatalog.getLoadPathForPackage(
+      name, version, constraintSolverOpts);
   },
 
   getLocalPackageNames: function () {
-    return this.localCatalog.getLocalPackageNames();
+    return this.localCatalog.getAllPackageNames();
   },
 
   getPackage: function (name) {

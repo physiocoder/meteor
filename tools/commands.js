@@ -584,11 +584,11 @@ main.registerCommand({
   // XXX copied from main.js
   // We need to re-initialize the complete catalog to know about the app we just
   // created, because it might have local packages.
-  var localPackageDirs = [path.resolve(appPath, 'packages')];
+  var localPackageSearchDirs = [path.resolve(appPath, 'packages')];
   if (process.env.PACKAGE_DIRS) {
     // User can provide additional package directories to search in PACKAGE_DIRS
     // (colon-separated).
-    localPackageDirs = localPackageDirs.concat(
+    localPackageSearchDirs = localPackageSearchDirs.concat(
       _.map(process.env.PACKAGE_DIRS.split(':'), function (p) {
         return path.resolve(p);
       }));
@@ -596,7 +596,7 @@ main.registerCommand({
   if (!files.usesWarehouse()) {
     // Running from a checkout, so use the Meteor core packages from
     // the checkout.
-    localPackageDirs.push(path.join(
+    localPackageSearchDirs.push(path.join(
       files.getCurrentToolsDir(), 'packages'));
   }
 
@@ -604,7 +604,7 @@ main.registerCommand({
     // XXX Hack. In the future we should just delay all use of catalog.complete
     // until this point.
     catalog.complete.initialize({
-      localPackageDirs: localPackageDirs
+      localPackageSearchDirs: localPackageSearchDirs
     });
 
     // Run the constraint solver. Override the assumption that using '--release'
@@ -1351,20 +1351,7 @@ main.registerCommand({
   // XXX not good to change the options this way
   _.extend(options, parsedUrl);
 
-  var testPackages = null;
-
-  var localPackages = null;
-  try {
-    var packages = getPackagesForTest(options.args);
-    if (typeof packages === "number")
-      return packages;
-    testPackages = packages.testPackages;
-    localPackages = packages.localPackages;
-    options.localPackageNames = packages.localPackages;
-  } catch (err) {
-    Console.stderr.write('\n' + err.message);
-    return 1;
-  }
+  var testPackages = getPackagesForTest(options.args);
 
   // Make a temporary app dir (based on the test runner app). This will be
   // cleaned up on process exit. Using a temporary app dir means that we can
@@ -1438,36 +1425,10 @@ main.registerCommand({
   return runTestAppForPackages(testPackages, testRunnerAppDir, options);
 });
 
-var getLocalPackages = function () {
-  var ret = {};
-  buildmessage.assertInCapture();
-
-  var names = catalog.complete.getAllPackageNames();
-  _.each(names, function (name) {
-    if (catalog.complete.isLocalPackage(name)) {
-      ret[name] = catalog.complete.getLatestMainlineVersion(name);
-    }
-  });
-
-  return ret;
-};
-
 // Ensures that packages are prepared and built for testing
 var getPackagesForTest = function (packages) {
   var testPackages;
-  var localPackageNames = [];
   if (packages.length === 0) {
-    // Test all local packages if no package is specified.
-    // XXX should this use the new getLocalPackageNames?
-    var packageList = commandsPackages.doOrDie(function () {
-      return getLocalPackages();
-    });
-    if (! packageList) {
-      // Couldn't load the package list, probably because some package
-      // has a parse error. Bail out -- this kind of sucks; we would
-      // like to find a way to get reloading.
-      throw new Error("No packages to test");
-    }
     testPackages = catalog.complete.getLocalPackageNames();
   } else {
     var messages = buildmessage.capture(function () {
@@ -1532,23 +1493,11 @@ var getPackagesForTest = function (packages) {
 
     if (messages.hasMessages()) {
       Console.stderr.write("\n" + messages.formatMessages());
-      return 1;
+      throw new main.ExitWithCode(1);
     }
   }
 
-  // Make a temporary app dir (based on the test runner app). This will be
-  // cleaned up on process exit. Using a temporary app dir means that we can
-  // run multiple "test-packages" commands in parallel without them stomping
-  // on each other.
-  //
-  // Note: testRunnerAppDir deliberately DOES NOT MATCH the app
-  // package search path baked into release.current.catalog: we are
-  // bundling the test runner app, but finding app packages from the
-  // current app (if any).
-  var testRunnerAppDir = files.mkdtemp('meteor-test-run');
-  files.cp_r(path.join(__dirname, 'test-runner-app'), testRunnerAppDir);
-
-  return { testPackages: testPackages, localPackages: localPackageNames };
+  return testPackages;
 };
 
 var runTestAppForPackages = function (testPackages, testRunnerAppDir, options) {
@@ -1557,25 +1506,19 @@ var runTestAppForPackages = function (testPackages, testRunnerAppDir, options) {
   // compute them for us. This means that right now, we are testing all packages
   // as they work together.
   var tests = [];
-  var messages = buildmessage.capture(function () {
-    _.each(testPackages, function(name) {
-      var versionNames = catalog.complete.getSortedVersions(name);
-      if (versionNames.length !== 1)
-        throw Error("local package should have one version?");
-      var versionRecord = catalog.complete.getVersion(name, versionNames[0]);
-      if (versionRecord && versionRecord.testName) {
-        tests.push(versionRecord.testName);
-      }
-    });
+  _.each(testPackages, function(name) {
+    var versionNames = catalog.complete.getSortedVersions(name);
+    if (versionNames.length !== 1)
+      throw Error("local package should have one version?");
+    var versionRecord = catalog.complete.getVersion(name, versionNames[0]);
+    if (versionRecord && versionRecord.testName) {
+      tests.push(versionRecord.testName);
+    }
   });
-  if (messages.hasMessages()) {
-    Console.stderr.write(messages.formatMessages());
-    return 1;
-  }
   project.forceEditPackages(tests, 'add');
 
   // We don't strictly need to do this before we bundle, but can't hurt.
-  messages = buildmessage.capture({
+  var messages = buildmessage.capture({
     title: 'Getting packages ready'
   },function () {
     project._ensureDepsUpToDate();
@@ -1628,10 +1571,6 @@ var runTestAppForPackages = function (testPackages, testRunnerAppDir, options) {
     });
   }
 
-  _.each(options.localPackageNames || [], function (name) {
-    catalog.complete.removeLocalPackage(name);
-  });
-
   return ret;
 };
 
@@ -1645,8 +1584,8 @@ main.registerCommand({
   hidden: true,
   catalogRefresh: new catalog.Refresh.OnceAtStart({ ignoreErrors: true })
 }, function (options) {
-  var messages;
   var count = 0;
+  var explicitPackages;
   // No packages specified. Rebuild everything.
   if (options.args.length === 0) {
     if (options.appDir) {
@@ -1658,19 +1597,18 @@ main.registerCommand({
       _.each(programsSubdirs, function (program) {
         // The implementation of this part of the function might change once we
         // change the control file format to explicitly specify packages and
-        // programs instead of just loading everything in the programs directory?
+        // programs instead of just loading everything in the programs
+        // directory?
         files.rm_recursive(path.join(programsDir, program, '.build.' + program));
       });
     }
-
-    messages = buildmessage.capture(function () {
-      count = catalog.complete.rebuildLocalPackages();
-    });
   } else {
-    messages = buildmessage.capture(function () {
-      count = catalog.complete.rebuildLocalPackages(options.args);
-    });
+    explicitPackages = options.args;
   }
+
+  var messages = buildmessage.capture(function () {
+      count = catalog.complete.rebuildLocalPackages(explicitPackages);
+  });
   if (count)
     console.log("Built " + count + " packages.");
   if (messages.hasMessages()) {
